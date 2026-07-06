@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FE — Teacher Integration</title>
+  <style>
+    :root { --bg:#0f1117;--s:#1a1d27;--s2:#22263a;--b:#2e3350;--t:#e2e8f0;--m:#8892b0; }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--t);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+    nav{display:flex;gap:6px;padding:14px 32px;background:var(--s);border-bottom:1px solid var(--b);align-items:center;}
+    nav strong{margin-right:8px;}
+    nav a{padding:5px 12px;border-radius:6px;font-size:13px;color:var(--m);text-decoration:none;border:1px solid transparent;}
+    nav a:hover{background:var(--s2);color:var(--t);}
+    nav a.active{background:var(--s2);color:var(--t);border-color:var(--b);}
+    nav a.fe{color:#4ade80;} nav a.uni{color:#60a5fa;} nav a.be{color:#f97316;}
+    .page{max-width:900px;margin:0 auto;padding:36px 24px 80px;}
+    h1{font-size:22px;font-weight:700;margin-bottom:4px;}
+    .sub{color:var(--m);font-size:13px;margin-bottom:36px;}
+    h2{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--m);margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--b);}
+    h3{font-size:13px;font-weight:700;margin:16px 0 8px;}
+    code{font-family:monospace;background:var(--s2);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+    pre{background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:12px;overflow-x:auto;font-size:11.5px;line-height:1.5;margin:8px 0;}
+    pre code{background:none;padding:0;font-family:monospace;}
+    .endpoint{background:var(--s);border:1px solid var(--b);border-radius:8px;margin:14px 0;cursor:pointer;user-select:none;}
+    .endpoint-head{display:flex;align-items:center;gap:10px;padding:12px 14px;font-weight:600;font-size:13px;}
+    .method{font-family:monospace;padding:2px 8px;border-radius:3px;font-weight:700;font-size:11.5px;}
+    .get{background:#0c1a3a;color:#60a5fa;}
+    .post{background:#0c2a0c;color:#4ade80;}
+    .put{background:#1a1a0c;color:#fbbf24;}
+    .del{background:#2a0c0c;color:#f87171;}
+    .toggle-icon{color:var(--m);font-size:16px;transition:transform 0.2s;}
+    .endpoint-body{max-height:0;overflow:hidden;transition:max-height 0.3s ease;padding:0 14px;}
+    .endpoint.open .endpoint-body{max-height:1000px;padding:12px 14px;}
+    .endpoint.open .toggle-icon{transform:rotate(180deg);}
+    .field-label{color:var(--m);font-size:12px;font-weight:700;margin-top:10px;}
+    .example{background:var(--s2);border-left:3px solid var(--b);padding:10px;margin:8px 0;font-size:11.5px;}
+    .error-code{background:var(--s2);padding:8px 12px;margin:4px 0;border-left:3px solid;font-size:12px;}
+    .err-4{border-color:#f87171;}
+    .err-9{border-color:#f87171;}
+    .box{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:16px;margin:14px 0;}
+  </style>
+</head>
+<body>
+<nav>
+  <strong>📋 Exam Feature</strong>
+  <a href="index.html">Overview</a>
+  <a href="fe.html" class="active fe">🖥 FE — Teacher</a>
+  <a href="unity.html" class="uni">🎮 Unity — Student</a>
+  <a href="be.html" class="be">⚙ BE — Backend</a>
+</nav>
+<div class="page">
+  <h1>🖥 FE — Teacher Integration</h1>
+  <div class="sub">Step-by-step guide for React/JS frontend with REST endpoints + Firebase real-time state listener.</div>
+
+  <h2>1. Teacher Login (Identity Service)</h2>
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>{IDENTITY_BASE_URL}/v1/identities/login</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request</div>
+      <pre><code>{
+  "username": "teacher@school.com",
+  "password": "secure_password"
+}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "jwt": "eyJhbGciOiJIUzI1NiIs..."
+}</code></pre>
+    </div>
+  </div>
+
+  <h2>2. Real-Time State from Firebase</h2>
+  <div class="box">
+    <h3>Single State Node Per Room</h3>
+    <p>Listen to: <code>exam-rooms/{examRoomId}/state</code></p>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;">Lambda updates this node whenever room state changes. Concurrent events just update the same node - last write wins. You get notified of changes, then call REST endpoints for full data.</p>
+    
+    <h3 style="margin-top:16px;">Example Timeline</h3>
+    <div class="example">
+      <strong>1. Teacher starts exam (POST /start)</strong><br>
+      Lambda writes to Firebase:<br>
+      <code>exam-rooms/ABC/state = { state: "IN_PROGRESS", timestamp: 1705315200000 }</code><br><br>
+      <strong>FE receives notification</strong> → calls <code>GET /participants</code> → shows student list
+    </div>
+    
+    <div class="example">
+      <strong>2. CR7 and Messi submit simultaneously</strong><br>
+      Both POST /submit endpoints fire at same time.<br>
+      Lambda updates Firebase (both target same node):<br>
+      <code>exam-rooms/ABC/state = { state: "IN_PROGRESS", eventCount: 2, timestamp: 1705318500000 }</code><br><br>
+      <strong>FE receives ONE notification</strong> (not two) → calls <code>GET /participants</code> → sees both submissions
+    </div>
+    
+    <div class="example">
+      <strong>3. Teacher ends exam (POST /end)</strong><br>
+      Lambda writes:<br>
+      <code>exam-rooms/ABC/state = { state: "ENDED", timestamp: 1705332000000 }</code><br><br>
+      <strong>FE receives notification</strong> → calls <code>GET /results</code> → shows leaderboard
+    </div>
+    
+    <h3 style="margin-top:16px;">Firebase State Payloads</h3>
+    <div class="field-label">WAITING (room created)</div>
+    <pre><code>{
+  "state": "WAITING",
+  "createdAt": 1705314000000,
+  "timestamp": 1705314000000
+}</code></pre>
+    
+    <div class="field-label">IN_PROGRESS (exam running)</div>
+    <pre><code>{
+  "state": "IN_PROGRESS",
+  "startedAt": 1705315200000,
+  "durationMinutes": 90,
+  "eventCount": 2,
+  "timestamp": 1705318500000
+}</code></pre>
+    
+    <div class="field-label">ENDED (exam finished)</div>
+    <pre><code>{
+  "state": "ENDED",
+  "endedAt": 1705332000000,
+  "timestamp": 1705332000000
+}</code></pre>
+  </div>
+
+  <h2>3. Exam Room Endpoints</h2>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>/exam-rooms</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Create exam room</div>
+      <pre><code>{
+  "title": "Math Final",
+  "description": "Chapter 5-8",
+  "durationMinutes": 90,
+  "assignmentId": "ASN_123"
+}</code></pre>
+      <div class="field-label">Response (201)</div>
+      <pre><code>{
+  "id": "ROOM_456",
+  "joinCode": "ABCD1234",
+  "createdAt": "2025-01-15T10:30:00Z",
+  "state": "WAITING"
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms/{id}</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get room details</div>
+      <pre><code>{
+  "id": "ROOM_456",
+  "title": "Math Final",
+  "state": "IN_PROGRESS",
+  "startedAt": "2025-01-15T10:45:00Z",
+  "durationMinutes": 90
+}</code></pre>
+    </div>
+  </div>
+
+  <h2>4. Room Control Endpoints</h2>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>/exam-rooms/{id}/start</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Start exam (move to IN_PROGRESS)</div>
+      <pre><code>Request body: {}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "id": "ROOM_456",
+  "state": "IN_PROGRESS",
+  "startedAt": "2025-01-15T10:45:00Z"
+}</code></pre>
+      <div class="field-label">Side effect:</div>
+      <p>Lambda writes to Firebase → Your listener gets notified → Call REST to refresh UI</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>/exam-rooms/{id}/end</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">End exam (move to ENDED)</div>
+      <pre><code>Request body: {}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "id": "ROOM_456",
+  "state": "ENDED",
+  "endedAt": "2025-01-15T12:15:00Z"
+}</code></pre>
+      <div class="field-label">Side effect:</div>
+      <p>Lambda writes to Firebase → Your listener gets notified → All students receive end notification</p>
+    </div>
+  </div>
+
+  <h2>5. Monitoring Endpoints</h2>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms/{id}/participants</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get all participants (call when state changes)</div>
+      <pre><code>{
+  "participants": [
+    { "studentId": "STU_001", "joinedAt": "2025-01-15T10:40:00Z", "submitted": true },
+    { "studentId": "STU_002", "joinedAt": "2025-01-15T10:41:00Z", "submitted": false }
+  ]
+}</code></pre>
+      <p style="font-size:12px;color:var(--m);margin-top:8px;"><strong>When to call:</strong> When Firebase state changes (WAITING/IN_PROGRESS states), to see current participants and submission status.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms/{id}/submissions</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get all submissions</div>
+      <pre><code>{
+  "submissions": [
+    { "studentId": "STU_001", "submittedAt": "2025-01-15T12:10:00Z", "score": 85 },
+    { "studentId": "STU_002", "submittedAt": "2025-01-15T12:12:00Z", "score": 92 }
+  ]
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms/{id}/results</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get leaderboard (call after exam ends)</div>
+      <pre><code>{
+  "results": [
+    { "rank": 1, "studentId": "STU_002", "score": 92 },
+    { "rank": 2, "studentId": "STU_001", "score": 85 }
+  ]
+}</code></pre>
+    </div>
+  </div>
+
+  <h2>6. Timer Formula</h2>
+  <div class="box">
+    <p>Calculate remaining time on exam from startedAt + durationMinutes:</p>
+    <pre><code>const remainingMs = (startedAt + durationMinutes * 60_000) - Date.now();
+const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));</code></pre>
+  </div>
+
+  <h2>7. Error Codes</h2>
+  <div style="display:grid;gap:8px;">
+    <div class="error-code err-4">
+      <strong>400 Bad Request:</strong> Invalid durationMinutes, title missing, etc.
+    </div>
+    <div class="error-code err-4">
+      <strong>401 Unauthorized:</strong> JWT missing or expired. Re-login.
+    </div>
+    <div class="error-code err-4">
+      <strong>403 Forbidden:</strong> Not authorized to create/modify this room.
+    </div>
+    <div class="error-code err-4">
+      <strong>404 Not Found:</strong> Exam room not found.
+    </div>
+    <div class="error-code err-4">
+      <strong>409 Conflict:</strong> Cannot start exam that's already started.
+    </div>
+  </div>
+
+  <h2>Quick Start Flow</h2>
+  <div class="box">
+    <ol style="color:var(--m);font-size:13px;padding-left:18px;">
+      <li>Teacher logs in → Get JWT token</li>
+      <li>Teacher creates exam room → Get joinCode & examRoomId</li>
+      <li>FE initializes Firebase listener for <code>exam-rooms/{examRoomId}/state</code></li>
+      <li>FE shows waiting room, calls <code>GET /participants</code> to show student list</li>
+      <li>Teacher clicks "Start" → <code>POST /start</code></li>
+      <li>Firebase listener notified → FE calls <code>GET /participants</code> again</li>
+      <li>FE shows live submission count (updates when Firebase state changes)</li>
+      <li>Teacher clicks "End" → Firebase listener notified</li>
+      <li>FE calls <code>GET /results</code> → Shows leaderboard</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.endpoint').forEach(el => {
+    el.querySelector('.endpoint-head').addEventListener('click', () => {
+      el.classList.toggle('open');
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unity — Student Integration</title>
+  <style>
+    :root { --bg:#0f1117;--s:#1a1d27;--s2:#22263a;--b:#2e3350;--t:#e2e8f0;--m:#8892b0; }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--t);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+    nav{display:flex;gap:6px;padding:14px 32px;background:var(--s);border-bottom:1px solid var(--b);align-items:center;}
+    nav strong{margin-right:8px;}
+    nav a{padding:5px 12px;border-radius:6px;font-size:13px;color:var(--m);text-decoration:none;border:1px solid transparent;}
+    nav a:hover{background:var(--s2);color:var(--t);}
+    nav a.active{background:var(--s2);color:var(--t);border-color:var(--b);}
+    nav a.fe{color:#4ade80;} nav a.uni{color:#60a5fa;} nav a.be{color:#f97316;}
+    .page{max-width:900px;margin:0 auto;padding:36px 24px 80px;}
+    h1{font-size:22px;font-weight:700;margin-bottom:4px;}
+    .sub{color:var(--m);font-size:13px;margin-bottom:36px;}
+    h2{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--m);margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--b);}
+    h3{font-size:13px;font-weight:700;margin:16px 0 8px;}
+    code{font-family:monospace;background:var(--s2);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+    pre{background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:12px;overflow-x:auto;font-size:11px;line-height:1.5;margin:8px 0;}
+    pre code{background:none;padding:0;font-family:monospace;}
+    .endpoint{background:var(--s);border:1px solid var(--b);border-radius:8px;margin:14px 0;cursor:pointer;user-select:none;}
+    .endpoint-head{display:flex;align-items:center;gap:10px;padding:12px 14px;font-weight:600;font-size:13px;}
+    .method{font-family:monospace;padding:2px 8px;border-radius:3px;font-weight:700;font-size:11.5px;}
+    .get{background:#0c1a3a;color:#60a5fa;}
+    .post{background:#0c2a0c;color:#4ade80;}
+    .put{background:#1a1a0c;color:#fbbf24;}
+    .del{background:#2a0c0c;color:#f87171;}
+    .toggle-icon{color:var(--m);font-size:16px;transition:transform 0.2s;}
+    .endpoint-body{max-height:0;overflow:hidden;transition:max-height 0.3s ease;padding:0 14px;}
+    .endpoint.open .endpoint-body{max-height:2000px;padding:12px 14px;}
+    .endpoint.open .toggle-icon{transform:rotate(180deg);}
+    .field-label{color:var(--m);font-size:12px;font-weight:700;margin-top:10px;}
+    .example{background:var(--s2);border-left:3px solid var(--b);padding:10px;margin:8px 0;font-size:11px;}
+    .error-code{background:var(--s2);padding:8px 12px;margin:4px 0;border-left:3px solid;font-size:12px;}
+    .err-4{border-color:#f87171;}
+    .box{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:16px;margin:14px 0;}
+  </style>
+</head>
+<body>
+<nav>
+  <strong>📋 Exam Feature</strong>
+  <a href="index.html">Overview</a>
+  <a href="fe.html" class="fe">🖥 FE — Teacher</a>
+  <a href="unity.html" class="active uni">🎮 Unity — Student</a>
+  <a href="be.html" class="be">⚙ BE — Backend</a>
+</nav>
+<div class="page">
+  <h1>🎮 Unity — Student Integration</h1>
+  <div class="sub">Step-by-step guide for Unity C# with REST endpoints + Firebase real-time state listener.</div>
+
+  <h2>1. Student Registration & Login</h2>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>{IDENTITY_BASE_URL}/api/v1/student/register</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request</div>
+      <pre><code>{
+  "email": "student@school.com",
+  "name": "John Doe"
+}</code></pre>
+      <div class="field-label">Response (201)</div>
+      <pre><code>{
+  "studentId": "STU_001",
+  "verificationPending": true
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>{IDENTITY_BASE_URL}/api/v1/student/verify-otp</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request (after receiving OTP via email)</div>
+      <pre><code>{
+  "studentId": "STU_001",
+  "otp": "123456"
+}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "verified": true
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>{IDENTITY_BASE_URL}/api/v1/student/login</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request</div>
+      <pre><code>{
+  "email": "student@school.com"
+}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "studentId": "STU_001"
+}</code></pre>
+      <p style="color:var(--m);font-size:12px;margin-top:8px;">Store this token for all subsequent requests.</p>
+    </div>
+  </div>
+
+  <h2>2. Real-Time State from Firebase</h2>
+  <div class="box">
+    <h3>Single State Node Per Room</h3>
+    <p>Listen to: <code>exam-rooms/{examRoomId}/state</code></p>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;">When room state changes, Lambda updates this node. You get notified of changes and extract critical data like startedAt + durationMinutes for the timer.</p>
+    
+    <h3 style="margin-top:16px;">Example Timeline</h3>
+    <div class="example">
+      <strong>1. You join exam (POST /join)</strong><br>
+      Lambda writes to Firebase:<br>
+      <code>exam-rooms/ABC/state = { state: "WAITING", participantCount: 15, timestamp: 1705314900000 }</code><br><br>
+      <strong>Your listener receives notification</strong> → Wait for exam to start
+    </div>
+    
+    <div class="example">
+      <strong>2. Teacher starts exam</strong><br>
+      Lambda writes:<br>
+      <code>exam-rooms/ABC/state = { state: "IN_PROGRESS", startedAt: 1705315200000, durationMinutes: 90, timestamp: 1705315200000 }</code><br><br>
+      <strong>Your listener receives notification</strong> → Extract startedAt + durationMinutes → Start countdown timer
+    </div>
+    
+    <div class="example">
+      <strong>3. You and others submit</strong><br>
+      Lambda updates Firebase (concurrent submissions):<br>
+      <code>exam-rooms/ABC/state = { state: "IN_PROGRESS", eventCount: 5, timestamp: 1705318500000 }</code><br><br>
+      <strong>Your listener receives notification</strong> → Submission recorded (visible to teacher)
+    </div>
+    
+    <div class="example">
+      <strong>4. Teacher ends exam</strong><br>
+      Lambda writes:<br>
+      <code>exam-rooms/ABC/state = { state: "ENDED", endedAt: 1705332000000, timestamp: 1705332000000 }</code><br><br>
+      <strong>Your listener receives notification</strong> → Show end screen
+    </div>
+    
+    <h3 style="margin-top:16px;">Firebase State Payloads</h3>
+    <div class="field-label">WAITING (before start)</div>
+    <pre><code>{
+  "state": "WAITING",
+  "participantCount": 15,
+  "createdAt": 1705314000000,
+  "timestamp": 1705314000000
+}</code></pre>
+    
+    <div class="field-label">IN_PROGRESS (during exam)</div>
+    <pre><code>{
+  "state": "IN_PROGRESS",
+  "startedAt": 1705315200000,
+  "durationMinutes": 90,
+  "eventCount": 5,
+  "timestamp": 1705318500000
+}</code></pre>
+    
+    <div class="field-label">ENDED (after exam)</div>
+    <pre><code>{
+  "state": "ENDED",
+  "endedAt": 1705332000000,
+  "timestamp": 1705332000000
+}</code></pre>
+  </div>
+
+  <h2>3. Join Exam Room</h2>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>/join</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request</div>
+      <pre><code>{
+  "joinCode": "ABCD1234",
+  "studentId": "STU_001"
+}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "examRoomId": "ROOM_456",
+  "title": "Math Final",
+  "state": "WAITING",
+  "durationMinutes": 90
+}</code></pre>
+      <div class="field-label">Side effect:</div>
+      <p>Lambda writes to Firebase → Teacher gets notified (sees new participant)</p>
+    </div>
+  </div>
+
+  <h2>4. Get Exam Questions</h2>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms/{id}/questions</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get all questions with S3 pre-signed URLs</div>
+      <pre><code>{
+  "questions": [
+    {
+      "questionId": "Q_001",
+      "text": "2 + 2 = ?",
+      "type": "multiple_choice",
+      "imageUrl": "https://s3.amazonaws.com/bucket/...",
+      "options": ["3", "4", "5"]
+    },
+    {
+      "questionId": "Q_002",
+      "text": "What is the capital of France?",
+      "type": "text"
+    }
+  ]
+}</code></pre>
+    </div>
+  </div>
+
+  <h2>5. Submit Answer</h2>
+
+  <div class="endpoint open">
+    <div class="endpoint-head">
+      <span class="method post">POST</span> <code>/exam-rooms/{id}/submit</code>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Request</div>
+      <pre><code>{
+  "questionId": "Q_001",
+  "answer": "4"
+}</code></pre>
+      <div class="field-label">Response (200)</div>
+      <pre><code>{
+  "questionId": "Q_001",
+  "received": true
+}</code></pre>
+      <div class="field-label">Side effect:</div>
+      <p>Lambda writes to Firebase → Teacher gets notified (submission count increases)</p>
+    </div>
+  </div>
+
+  <h2>6. Timer Formula</h2>
+  <div class="box">
+    <p>Calculate remaining time on exam from startedAt + durationMinutes:</p>
+    <pre><code>long startedAtEpoch = (long)eventData["startedAt"];
+long durationMinutes = (long)eventData["durationMinutes"];
+long durationMs = durationMinutes * 60_000L;
+
+long epochNow = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+long remainingMs = (startedAtEpoch + durationMs) - epochNow;
+
+if (remainingMs <= 0) {
+  // Time's up
+} else {
+  int remainingSeconds = (int)(remainingMs / 1000);
+  StartCountdown(remainingSeconds);
+}</code></pre>
+  </div>
+
+  <h2>7. Reconnect Handling</h2>
+  <div class="box">
+    <p><strong>Firebase automatically handles reconnects.</strong> If connection drops:</p>
+    <ul style="padding-left:18px;color:var(--m);font-size:13px;">
+      <li>Firebase SDK caches the subscription</li>
+      <li>On reconnect, current state is replayed</li>
+      <li>No manual reconnect logic needed</li>
+      <li>If you need latest state, call <code>GET /exam-rooms/{id}</code> to recover</li>
+    </ul>
+  </div>
+
+  <h2>8. Error Codes</h2>
+  <div style="display:grid;gap:8px;">
+    <div class="error-code err-4">
+      <strong>400 Bad Request:</strong> Invalid joinCode format, missing studentId, etc.
+    </div>
+    <div class="error-code err-4">
+      <strong>401 Unauthorized:</strong> Access token missing, expired, or invalid.
+    </div>
+    <div class="error-code err-4">
+      <strong>404 Not Found:</strong> Exam room not found, or joinCode doesn't exist.
+    </div>
+    <div class="error-code err-4">
+      <strong>409 Conflict:</strong> Student already joined this room, or exam already ended.
+    </div>
+  </div>
+
+  <h2>9. Quick Start Flow (Student)</h2>
+  <div class="box">
+    <ol style="color:var(--m);font-size:13px;padding-left:18px;">
+      <li>Register → OTP email received</li>
+      <li>Verify OTP → verification complete</li>
+      <li>Login → Get accessToken</li>
+      <li>Enter joinCode and click "Join" → <code>POST /join</code></li>
+      <li>Lambda writes to Firebase → Teacher sees you joined</li>
+      <li>Initialize Firebase listener for <code>exam-rooms/{examRoomId}/state</code></li>
+      <li>Show waiting screen - "Waiting for teacher to start..."</li>
+      <li>Teacher clicks Start → Firebase listener receives <code>IN_PROGRESS</code> state</li>
+      <li>Extract startedAt + durationMinutes from state → Start countdown timer</li>
+      <li>Fetch questions → <code>GET /exam-rooms/{id}/questions</code></li>
+      <li>Answer and submit questions → <code>POST /submit</code></li>
+      <li>Firebase listener notifies teacher of submission</li>
+      <li>Teacher ends exam → Firebase listener receives <code>ENDED</code> state</li>
+      <li>Show end screen</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.endpoint').forEach(el => {
+    el.querySelector('.endpoint-head').addEventListener('click', () => {
+      el.classList.toggle('open');
+    });
+  });
+</script>
+</body>
+</html>

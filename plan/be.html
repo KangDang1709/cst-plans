@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BE — Backend Implementation</title>
+  <style>
+    :root { --bg:#0f1117;--s:#1a1d27;--s2:#22263a;--b:#2e3350;--t:#e2e8f0;--m:#8892b0; }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--t);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+    nav{display:flex;gap:6px;padding:14px 32px;background:var(--s);border-bottom:1px solid var(--b);align-items:center;}
+    nav strong{margin-right:8px;}
+    nav a{padding:5px 12px;border-radius:6px;font-size:13px;color:var(--m);text-decoration:none;border:1px solid transparent;}
+    nav a:hover{background:var(--s2);color:var(--t);}
+    nav a.active{background:var(--s2);color:var(--t);border-color:var(--b);}
+    nav a.be{color:#f97316;} nav a.fe{color:#4ade80;} nav a.uni{color:#60a5fa;}
+    .page{max-width:1000px;margin:0 auto;padding:36px 24px 80px;}
+    h1{font-size:22px;font-weight:700;margin-bottom:4px;}
+    .sub{color:var(--m);font-size:13px;margin-bottom:36px;}
+    h2{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--m);margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--b);}
+    h3{font-size:13px;font-weight:700;margin:16px 0 8px;}
+    h4{font-size:12px;font-weight:700;margin:12px 0 6px;color:var(--m);}
+    code{font-family:monospace;background:var(--s2);padding:1px 5px;border-radius:3px;font-size:12.5px;}
+    pre{background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:12px;overflow-x:auto;font-size:11.5px;line-height:1.5;margin:8px 0;}
+    pre code{background:none;padding:0;font-family:monospace;}
+    .box{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:16px;margin:14px 0;}
+    .table-box{background:var(--s);border:1px solid var(--b);border-radius:8px;overflow:hidden;margin:14px 0;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{background:var(--s2);padding:10px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--b);}
+    td{padding:10px 12px;border-bottom:1px solid var(--b);}
+    tr:last-child td{border-bottom:none;}
+    .tag{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;}
+    .be-tag{background:rgba(249,115,22,0.2);color:#fb923c;}
+    .fe-tag{background:rgba(74,222,128,0.2);color:#4ade80;}
+    .uni-tag{background:rgba(96,165,250,0.2);color:#60a5fa;}
+    .example{background:var(--s2);border-left:3px solid var(--b);padding:10px;margin:8px 0;font-size:11.5px;}
+    .warning{background:rgba(249,115,22,0.15);border-left:3px solid #f97316;padding:12px;margin:8px 0;border-radius:4px;font-size:12px;}
+    .check{background:rgba(74,222,128,0.15);border-left:3px solid #4ade80;padding:12px;margin:8px 0;border-radius:4px;font-size:12px;}
+    .method-tag{font-family:monospace;padding:2px 8px;border-radius:3px;font-weight:700;font-size:11.5px;display:inline-block;margin-right:8px;}
+    .get{background:#0c1a3a;color:#60a5fa;}
+    .post{background:#0c2a0c;color:#4ade80;}
+    .put{background:#1a1a0c;color:#fbbf24;}
+    ul, ol{margin-left:16px;margin-top:8px;}
+    li{margin-bottom:4px;}
+  </style>
+</head>
+<body>
+<nav>
+  <strong>📋 Exam Feature</strong>
+  <a href="index.html">Overview</a>
+  <a href="fe.html" class="fe">🖥 FE — Teacher</a>
+  <a href="unity.html" class="uni">🎮 Unity — Student</a>
+  <a href="be.html" class="active be">⚙ BE — Backend</a>
+</nav>
+
+<div class="page">
+  <h1>⚙ BE — Backend Implementation</h1>
+  <div class="sub">Database schema, Lambda functions, Firebase integration, and infrastructure deployment plan.</div>
+
+  <h2>1. DynamoDB Tables</h2>
+  
+  <h3>ExamRooms Table</h3>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Key</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>examRoomId</code></td><td>String</td><td>PK</td><td>UUID, auto-generated</td></tr>
+        <tr><td><code>teacherId</code></td><td>String</td><td>-</td><td>From JWT claim</td></tr>
+        <tr><td><code>joinCode</code></td><td>String</td><td>GSI</td><td>Unique 6-char alphanumeric code for students</td></tr>
+        <tr><td><code>roomName</code></td><td>String</td><td>-</td><td>Exam room name (from US-2 modal)</td></tr>
+        <tr><td><code>subject</code></td><td>String</td><td>-</td><td>Subject (Môn) — e.g., "Toán"</td></tr>
+        <tr><td><code>grade</code></td><td>String</td><td>-</td><td>Grade (Khối) — e.g., "Lớp 1" through "Lớp 12"</td></tr>
+        <tr><td><code>state</code></td><td>String</td><td>-</td><td>"WAITING", "IN_PROGRESS", "ENDED"</td></tr>
+        <tr><td><code>assignmentId</code></td><td>String</td><td>-</td><td>Link to exam questions (max 1)</td></tr>
+        <tr><td><code>durationMinutes</code></td><td>Number</td><td>-</td><td>15-180 minutes (from button group or custom)</td></tr>
+        <tr><td><code>mode</code></td><td>String</td><td>-</td><td>"auto_advance" or "bell_alert" (Chế độ thi)</td></tr>
+        <tr><td><code>scheduledStartAt</code></td><td>Number</td><td>-</td><td>Null if publish now; epoch ms if scheduled (Flow 2)</td></tr>
+        <tr><td><code>createdAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
+        <tr><td><code>startedAt</code></td><td>Number</td><td>-</td><td>When state → IN_PROGRESS (Lambda or scheduler)</td></tr>
+        <tr><td><code>endedAt</code></td><td>Number</td><td>-</td><td>When state → ENDED</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>ExamSubmissions Table</h3>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Key</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>submissionId</code></td><td>String</td><td>PK</td><td>UUID</td></tr>
+        <tr><td><code>examRoomId</code></td><td>String</td><td>SK</td><td>From room (enables LSI/GSI)</td></tr>
+        <tr><td><code>studentId</code></td><td>String</td><td>-</td><td>From auth token</td></tr>
+        <tr><td><code>answers</code></td><td>Map</td><td>-</td><td><code>{ questionId: answer, ... }</code></td></tr>
+        <tr><td><code>submittedAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
+        <tr><td><code>isLate</code></td><td>Boolean</td><td>-</td><td>Submitted after exam end</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>ExamParticipants Table</h3>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Key</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>participantId</code></td><td>String</td><td>PK</td><td>examRoomId#studentId</td></tr>
+        <tr><td><code>examRoomId</code></td><td>String</td><td>SK</td><td>For queries</td></tr>
+        <tr><td><code>studentId</code></td><td>String</td><td>-</td><td></td></tr>
+        <tr><td><code>studentName</code></td><td>String</td><td>-</td><td></td></tr>
+        <tr><td><code>joinedAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
+        <tr><td><code>hasSubmitted</code></td><td>Boolean</td><td>-</td><td>Updated on POST /submit</td></tr>
+        <tr><td><code>submittedAt</code></td><td>Number</td><td>-</td><td>Null until submission</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>2. Lambda Functions & Firebase Integration</h2>
+
+  <h3>POST /create-exam-room</h3>
+  <div class="box">
+    <h4>Request Body (from US-2 Modal)</h4>
+    <pre><code>{
+  "roomName": "Kiểm tra Toán Chương 3",
+  "subject": "Toán",
+  "grade": "Lớp 6",
+  "durationMinutes": 60,
+  "mode": "auto_advance",
+  "assignmentId": "assign123",
+  "publishNow": true,
+  "scheduledStartAt": null
+}</code></pre>
+
+    <h4>Handler Flow</h4>
+    <ol>
+      <li><strong>Validation</strong>
+        <ul>
+          <li>JWT → extract teacherId</li>
+          <li>Fields: roomName, subject, grade, durationMinutes (15-180), mode, assignmentId</li>
+          <li>If publishNow=false: verify scheduledStartAt is future timestamp</li>
+        </ul>
+      </li>
+      <li><strong>External Validation</strong>
+        <ul>
+          <li>Assignment Service: <code>GET /assignments/{assignmentId}</code> → validate + question count</li>
+          <li>Verify subject + grade are valid</li>
+        </ul>
+      </li>
+      <li><strong>Generate IDs</strong>
+        <ul>
+          <li>examRoomId = UUID</li>
+          <li>joinCode = 6-char alphanumeric (A-Z, 0-9), verify unique</li>
+        </ul>
+      </li>
+      <li><strong>Create DynamoDB</strong>
+        <ul>
+          <li>state = "WAITING" (both flows)</li>
+          <li>If publishNow=true: startedAt=now() (teacher enters waiting room 10 min early)</li>
+          <li>If publishNow=false: scheduledStartAt=provided, startedAt=null (await scheduler)</li>
+        </ul>
+      </li>
+      <li><span class="tag be-tag">Firebase</span> <strong>Conditional</strong>
+        <ul>
+          <li><strong>Flow 1 (publishNow=true):</strong> Write to state node with startedAt + durationMinutes</li>
+          <li><strong>Flow 2 (publishNow=false):</strong> NO WRITE (wait for scheduled time)</li>
+        </ul>
+      </li>
+      <li><strong>Response</strong>
+        <ul>
+          <li>Return 201: examRoomId, joinCode, state, scheduledStartAt</li>
+          <li>FE Flow 1: Redirect to Waiting Room</li>
+          <li>FE Flow 2: Show success popup with room code + copy button</li>
+        </ul>
+      </li>
+    </ol>
+    <div class="check">✓ Flow 1: publishNow=true → Firebase write now → students can join<br/>✓ Flow 2: publishNow=false → Lambda scheduler monitors scheduledStartAt → Firebase write at time</div>
+  </div>
+
+  <h3>POST /start-exam (Teacher) — Flow 1 Only</h3>
+  <div class="box">
+    <p style="color:var(--m);font-size:12px;margin-bottom:12px;"><strong>Note:</strong> Only if room created with publishNow=true. If publishNow=false (scheduled), DO NOT show this button — scheduler handles state transition.</p>
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT + examRoomId ownership</li>
+      <li>Verify room state = "WAITING" AND publishNow=true</li>
+      <li>Calculate durationMs = durationMinutes * 60_000</li>
+      <li><strong>Update DynamoDB:</strong> Set state→"IN_PROGRESS", startedAt→now()</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> with:<pre><code>{
+  "state": "IN_PROGRESS",
+  "startedAt": 1705315200000,
+  "durationMinutes": 90,
+  "eventCount": 0,
+  "timestamp": 1705315200000
+}</code></pre></li>
+      <li>Both FE + Unity receive notification via Firebase listener</li>
+      <li>Return 200 OK</li>
+    </ol>
+    <div class="warning">⚠️ Firebase write targets same node regardless of action. Concurrent /start requests will overwrite each other (OK — idempotent state update).</div>
+  </div>
+
+  <h3>POST /join-exam (Student)</h3>
+  <div class="box">
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT (student token) → extract studentId</li>
+      <li>Query by joinCode (GSI) → get examRoomId + room details</li>
+      <li>Verify room state ∈ ["WAITING", "IN_PROGRESS"] (can't join after ENDED)</li>
+      <li><strong>Write DynamoDB ExamParticipants:</strong> Create entry with joinedAt=now(), hasSubmitted=false</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> (increment eventCount or update timestamp)<pre><code>{
+  "state": "...",
+  "eventCount": 5,
+  "timestamp": 1705315300000
+}</code></pre></li>
+      <li>Teacher receives Firebase notification → calls <code>GET /participants</code> → sees new student</li>
+      <li>Return examRoomId + room metadata (durationMinutes, startedAt if IN_PROGRESS)</li>
+    </ol>
+  </div>
+
+  <h3>POST /submit-answers (Student)</h3>
+  <div class="box">
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT (student token)</li>
+      <li>Verify room state = "IN_PROGRESS" (can submit during exam only)</li>
+      <li>Validate answers against Assignment Service: <code>GET /assignments/{assignmentId}/questions</code></li>
+      <li><strong>Write DynamoDB ExamSubmissions:</strong> Create submission record with timestamp</li>
+      <li><strong>Update DynamoDB ExamParticipants:</strong> Set hasSubmitted=true, submittedAt=now()</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> (increment eventCount)<pre><code>{
+  "state": "IN_PROGRESS",
+  "startedAt": 1705315200000,
+  "durationMinutes": 90,
+  "eventCount": 2,
+  "timestamp": 1705315350000
+}</code></pre></li>
+      <li>Teacher receives Firebase notification → calls <code>GET /participants</code> → sees submission count increased</li>
+      <li>Return 201 Created + submissionId</li>
+    </ol>
+    <div class="warning">⚠️ Concurrent submissions (CR7 + Messi at same time) both target same Firebase node. Last write wins — but eventCount may not increment properly. Consider: atomically increment eventCount in Lambda BEFORE writing to Firebase.</div>
+  </div>
+
+  <h3>POST /end-exam (Teacher)</h3>
+  <div class="box">
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT + examRoomId ownership</li>
+      <li>Verify room state = "IN_PROGRESS" (can't end if not started)</li>
+      <li><strong>Update DynamoDB ExamRooms:</strong> Set state→"ENDED", endedAt→now()</li>
+      <li>Query ExamSubmissions + ExamParticipants for results</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> with:<pre><code>{
+  "state": "ENDED",
+  "endedAt": 1705332000000,
+  "timestamp": 1705332000000
+}</code></pre></li>
+      <li>Both FE + Unity receive notification</li>
+      <li>Teacher calls <code>GET /results</code>; students see end screen</li>
+      <li>Return 200 OK</li>
+    </ol>
+  </div>
+
+  <h3>GET /participants (Teacher)</h3>
+  <div class="box">
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT + examRoomId ownership</li>
+      <li>Query DynamoDB ExamParticipants where examRoomId = X</li>
+      <li>Return array with all students: name, joinedAt, hasSubmitted, submittedAt</li>
+      <li><strong>No Firebase read</strong> (REST is source of truth for data)</li>
+    </ol>
+    <div class="check">✓ Called by FE after Firebase notification of /join or /submit</div>
+  </div>
+
+  <h3>GET /results (Teacher)</h3>
+  <div class="box">
+    <h4>Handler Flow</h4>
+    <ol>
+      <li>Validate JWT + examRoomId ownership</li>
+      <li>Verify room state = "ENDED" (can't get results before end)</li>
+      <li>Query DynamoDB ExamSubmissions + ExamParticipants</li>
+      <li>Join with Question answers (from Assignment Service)</li>
+      <li>Calculate scores, sort by submission time</li>
+      <li>Return leaderboard array</li>
+    </ol>
+  </div>
+
+  <h3>Scheduled Exam Processor (Flow 2 — publishNow=false)</h3>
+  <div class="box">
+    <h4>Purpose</h4>
+    <p style="color:var(--m);font-size:12px;margin-bottom:12px;">Periodically checks for exams with scheduledStartAt in the past + state=WAITING. When scheduled time arrives, automatically transitions state → IN_PROGRESS and writes to Firebase.</p>
+    
+    <h4>Implementation Options</h4>
+    <ul>
+      <li><strong>Option 1: CloudWatch Event + Lambda (AWS Native)</strong>
+        <ul>
+          <li>CloudWatch rule: Trigger every 1 minute</li>
+          <li>Lambda: Query ExamRooms where scheduledStartAt ≤ now() AND state=WAITING</li>
+          <li>For each: Update state→IN_PROGRESS, write to Firebase</li>
+          <li>Cost: ~43K invocations/month = ~$1 (minimal)</li>
+        </ul>
+      </li>
+      <li><strong>Option 2: DynamoDB Streams (Event-Driven)</strong>
+        <ul>
+          <li>Monitor room creation events</li>
+          <li>Lambda: Register scheduledStartAt in SQS/SNS delayed queue</li>
+          <li>Trigger handler at scheduled time</li>
+          <li>More complex setup, better for high throughput</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h4>Processor Handler Flow</h4>
+    <ol>
+      <li>Query DynamoDB: <code>SELECT * FROM ExamRooms WHERE scheduledStartAt ≤ now() AND state='WAITING'</code></li>
+      <li>For each room:
+        <ul>
+          <li>Update: state→"IN_PROGRESS", startedAt→now()</li>
+          <li><span class="tag be-tag">Firebase WRITE:</span> Update state node with startedAt + durationMinutes</li>
+          <li>Both FE + Unity get notifications instantly</li>
+        </ul>
+      </li>
+      <li>Log processed rooms for monitoring</li>
+    </ol>
+
+    <div class="check">✓ Automatic state transition at scheduled time<br/>✓ Students see Firebase notification and can start exam<br/>✓ Teacher can also manually call POST /start-exam if needed</div>
+  </div>
+
+  <h2>3. Firebase Realtime Database Setup</h2>
+
+  <h3>Database Structure</h3>
+  <pre><code>exam-rooms/
+  ├── {examRoomId}/
+      └── state: { state, startedAt?, durationMinutes?, endedAt?, eventCount, timestamp }
+      └── (no persistent event history — ephemeral only)</code></pre>
+
+  <h3>Firebase Initialization in Lambda</h3>
+  <div class="example"><strong>Node.js / TypeScript</strong><pre><code>import * as admin from 'firebase-admin';
+
+// Initialize once at module level
+const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: process.env.FIREBASE_DB_URL
+});
+
+const db = admin.database();
+
+// On state change, write to Firebase
+async function updateExamState(examRoomId: string, state: any) {
+  await db.ref(`exam-rooms/${examRoomId}/state`).set({
+    ...state,
+    timestamp: Date.now()
+  });
+}</code></pre></div>
+
+  <h3>Firebase Rules (Security)</h3>
+  <pre><code>{
+  "rules": {
+    "exam-rooms": {
+      "$examRoomId": {
+        "state": {
+          // Only Lambda writes (via service account)
+          ".write": "auth.uid === 'lambda-service-account-uid'",
+          // FE + Unity can read
+          ".read": "auth != null"
+        }
+      }
+    }
+  }
+}</code></pre>
+
+  <h2>4. Infrastructure & Deployment</h2>
+
+  <h3>AWS Lambda Configuration</h3>
+  <div class="box">
+    <h4>Environment Variables</h4>
+    <ul>
+      <li><code>DYNAMODB_EXAM_ROOMS_TABLE</code> = "ExamRooms"</li>
+      <li><code>DYNAMODB_EXAM_SUBMISSIONS_TABLE</code> = "ExamSubmissions"</li>
+      <li><code>DYNAMODB_EXAM_PARTICIPANTS_TABLE</code> = "ExamParticipants"</li>
+      <li><code>FIREBASE_DB_URL</code> = "https://your-project.firebaseio.com"</li>
+      <li><code>FIREBASE_CREDENTIALS</code> = JSON service account key</li>
+      <li><code>IDENTITY_SERVICE_URL</code> = "https://identity-service.internal"</li>
+      <li><code>ASSIGNMENT_SERVICE_URL</code> = "https://assignment-service.internal"</li>
+    </ul>
+
+    <h4>Runtime & Dependencies</h4>
+    <ul>
+      <li>Node.js 20.x (or C# 8.0 if using .NET Lambda)</li>
+      <li>firebase-admin@latest</li>
+      <li>aws-sdk v3 (DynamoDB client)</li>
+      <li>Timeout: 30s (sufficient for serial DynamoDB + Firebase writes)</li>
+      <li>Memory: 512MB (default)</li>
+    </ul>
+
+    <h4>IAM Permissions (Lambda Execution Role)</h4>
+    <ul>
+      <li><code>dynamodb:PutItem</code>, <code>dynamodb:UpdateItem</code>, <code>dynamodb:GetItem</code>, <code>dynamodb:Query</code> on ExamRooms, ExamSubmissions, ExamParticipants</li>
+      <li><code>dynamodb:GetItem</code> with GSI on joinCode</li>
+      <li>No S3 needed (questions fetched from Assignment Service)</li>
+    </ul>
+  </div>
+
+  <h3>DynamoDB Indexing</h3>
+  <div class="box">
+    <h4>ExamRooms Table</h4>
+    <ul>
+      <li><strong>Primary Key:</strong> examRoomId (HASH)</li>
+      <li><strong>GSI:</strong> joinCode → allows rapid lookup by student code</li>
+      <li><strong>TTL:</strong> Optional — set on endedAt to auto-delete old exams (e.g., 90 days)</li>
+    </ul>
+
+    <h4>ExamSubmissions Table</h4>
+    <ul>
+      <li><strong>Primary Key:</strong> submissionId (HASH) + examRoomId (RANGE)</li>
+      <li><strong>GSI:</strong> examRoomId + submittedAt → query results by room</li>
+    </ul>
+
+    <h4>ExamParticipants Table</h4>
+    <ul>
+      <li><strong>Primary Key:</strong> participantId (HASH, format: examRoomId#studentId)</li>
+      <li><strong>GSI:</strong> examRoomId + joinedAt → list all students in room</li>
+    </ul>
+  </div>
+
+  <h3>Error Handling & Logging</h3>
+  <div class="box">
+    <h4>Errors from Each Endpoint</h4>
+    <ul>
+      <li><code>400 Bad Request</code> — Invalid JWT, missing fields, invalid assignmentId</li>
+      <li><code>401 Unauthorized</code> — Invalid/expired JWT, mismatched teacherId</li>
+      <li><code>403 Forbidden</code> — Teacher trying to access student data, vice versa</li>
+      <li><code>404 Not Found</code> — examRoomId not found, joinCode not found</li>
+      <li><code>409 Conflict</code> — State transition invalid (e.g., /start on room already IN_PROGRESS)</li>
+      <li><code>500 Internal Server Error</code> — DynamoDB/Firebase failure</li>
+    </ul>
+
+    <h4>Logging Strategy</h4>
+    <pre><code>console.log(JSON.stringify({
+  timestamp: new Date().toISOString(),
+  level: 'INFO',
+  action: 'start-exam',
+  examRoomId: 'xyz',
+  teacherId: 'abc',
+  durationMinutes: 90,
+  dynamoSuccess: true,
+  firebaseSuccess: true,
+  duration_ms: 245
+}));</code></pre>
+    <ul>
+      <li>Log all DynamoDB writes with success/failure + latency</li>
+      <li>Log all Firebase writes + eventCount (for concurrency tracking)</li>
+      <li>Log any failed calls to external services (Identity, Assignment)</li>
+      <li>Use CloudWatch Insights to query by examRoomId or error rate</li>
+    </ul>
+  </div>
+
+  <h2>5. Deployment Checklist</h2>
+
+  <div class="check">
+    <strong>Pre-Deployment</strong>
+    <ul>
+      <li>✓ DynamoDB tables created with correct indexes + GSI</li>
+      <li>✓ Firebase project initialized, database URL configured</li>
+      <li>✓ Firebase service account JSON in Lambda env var</li>
+      <li>✓ Firebase rules allow Lambda writes + client reads</li>
+      <li>✓ Identity Service integration tested</li>
+      <li>✓ Assignment Service integration tested</li>
+      <li>✓ Lambda IAM role has DynamoDB + env var access</li>
+      <li>✓ API Gateway routes mapped to Lambda functions</li>
+    </ul>
+  </div>
+
+  <div class="check">
+    <strong>Testing</strong>
+    <ul>
+      <li>✓ Unit test: DynamoDB writes succeed</li>
+      <li>✓ Unit test: Firebase writes succeed</li>
+      <li>✓ Integration test: Create room → Join → Start → Submit → End (full flow)</li>
+      <li>✓ Concurrency test: 10 students submit simultaneously (eventCount increments properly)</li>
+      <li>✓ Edge case: Student joins after exam ended (should fail with 409)</li>
+      <li>✓ Edge case: Teacher starts exam twice (should succeed idempotently or fail with 409)</li>
+      <li>✓ Error handling: Simulate DynamoDB timeout → Lambda should retry + return 500</li>
+      <li>✓ Firebase listener: Verify FE + Unity receive notifications within 1s</li>
+    </ul>
+  </div>
+
+  <div class="warning">
+    <strong>Post-Deployment Monitoring</strong>
+    <ul>
+      <li>Monitor DynamoDB latency (should be &lt;100ms)</li>
+      <li>Monitor Firebase write latency (should be &lt;500ms)</li>
+      <li>Alert on Lambda failures (error rate &gt; 1%)</li>
+      <li>Alert on concurrent write conflicts (check eventCount increments)</li>
+      <li>Log exam duration + submission count for capacity planning</li>
+    </ul>
+  </div>
+
+  <h2>6. Quick Implementation Order</h2>
+  <div class="box">
+    <ol style="list-style: decimal;">
+      <li><strong>Week 1:</strong> DynamoDB schema + basic CRUD endpoints (no Firebase yet)</li>
+      <li><strong>Week 2:</strong> Integrate with Identity Service (JWT validation)</li>
+      <li><strong>Week 3:</strong> Integrate with Assignment Service (question validation)</li>
+      <li><strong>Week 4:</strong> Add Firebase writes to each endpoint</li>
+      <li><strong>Week 5:</strong> Test full flow with FE + Unity teams</li>
+      <li><strong>Week 6:</strong> Performance tuning + deployment</li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>
