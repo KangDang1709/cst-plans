@@ -310,7 +310,112 @@ if (remainingMs <= 0) {
       <li>Show end screen</li>
     </ol>
   </div>
-</div>
+  <h2>10. Unity C# Implementation (Firebase Real-Time)</h2>
+  <div class="box">
+    <h3>Complete Sample Code</h3>
+    <pre><code>using Firebase.Database;
+using UnityEngine;
+using System;
+using System.Collections;
+
+public class ExamTimer : MonoBehaviour
+{
+    private FirebaseDatabase firebaseDb;
+    private string examRoomId = "ROOM_456"; // From API response when joined
+    private DatabaseReference stateRef;
+
+    void Start()
+    {
+        // Subscribe to Firebase real-time updates
+        firebaseDb = FirebaseDatabase.DefaultInstance;
+        stateRef = firebaseDb.GetReference($"exam-rooms/{examRoomId}/state");
+        
+        // This listener fires EVERY time the state changes
+        stateRef.ValueChanged += OnExamStateChanged;
+    }
+
+    // ============================================================
+    // REAL-TIME LISTENER (Fires when state changes in Firebase)
+    // ============================================================
+    private void OnExamStateChanged(object sender, ValueChangedEventArgs args)
+    {
+        var stateData = args.Snapshot.Value as Dictionary&lt;string, object&gt;;
+        string state = stateData["state"].ToString();
+
+        if (state == "IN_PROGRESS")
+        {
+            // Teacher started the exam
+            long startedAt = long.Parse(stateData["startedAt"].ToString());
+            long durationMinutes = long.Parse(stateData["durationMinutes"].ToString());
+
+            StartTimer(startedAt, durationMinutes);
+        }
+        else if (state == "ENDED")
+        {
+            // Exam ended
+            StopAllCoroutines();
+            Debug.Log("Exam finished");
+        }
+    }
+
+    // ============================================================
+    // COUNTDOWN TIMER LOGIC
+    // ============================================================
+    private void StartTimer(long startedAtMs, long durationMinutes)
+    {
+        // endTime = when exam should end
+        long endTimeMs = startedAtMs + (durationMinutes * 60_000L);
+        
+        StartCoroutine(CountdownCoroutine(endTimeMs));
+    }
+
+    private IEnumerator CountdownCoroutine(long endTimeMs)
+    {
+        while (true)
+        {
+            long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long remainingMs = endTimeMs - nowMs;
+
+            if (remainingMs &lt;= 0)
+            {
+                Debug.Log("Time's up!");
+                break;
+            }
+
+            // Display timer (MM:SS)
+            int seconds = (int)(remainingMs / 1000);
+            int mins = seconds / 60;
+            int secs = seconds % 60;
+
+            Debug.Log($"⏱ {mins:D2}:{secs:D2}");
+            // UI.timerText.text = $"{mins:D2}:{secs:D2}";
+
+            yield return new WaitForSeconds(1f);
+        }
+    }
+
+    void OnDestroy()
+    {
+        stateRef.ValueChanged -= OnExamStateChanged;
+    }
+}</code></pre>
+
+    <h3 style="margin-top:16px;">How It Works</h3>
+    <ul style="color:var(--m);font-size:13px;padding-left:18px;">
+      <li><strong>OnExamStateChanged</strong> — Fired instantly when Firebase state changes (no polling)</li>
+      <li><strong>startedAt + durationMinutes</strong> — Extract absolute end time from state</li>
+      <li><strong>CountdownCoroutine</strong> — Use server time to calculate remaining minutes/seconds</li>
+      <li><strong>Automatic reconnect</strong> — Firebase SDK handles drops and replays current state</li>
+    </ul>
+
+    <h3 style="margin-top:16px;">Setup Requirements</h3>
+    <ul style="color:var(--m);font-size:13px;padding-left:18px;">
+      <li>Install Firebase Unity SDK from <a href="https://firebase.google.com/download/unity" target="_blank" style="color:#60a5fa;">Firebase Console</a></li>
+      <li>Initialize Firebase in your scene (FirebaseApp.CheckAndFixDependenciesAsync)</li>
+      <li>Get <code>examRoomId</code> from <code>POST /join</code> response</li>
+      <li>Attach this script to a GameObject that persists during the exam</li>
+    </ul>
+  </div></div>
 
 <script>
   document.querySelectorAll('.endpoint').forEach(el => {
