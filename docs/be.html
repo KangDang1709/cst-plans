@@ -175,52 +175,65 @@
           <li>state = "WAITING" (both flows) — room is now published/created</li>
           <li>If startNow=true: publishAt = now + 10 minutes (auto-calculated by Lambda)</li>
           <li>If startNow=false: publishAt = teacher-provided timestamp</li>
-          <li>Create EventBridge rules for publishAt and (publishAt + durationMinutes)</li>
+          <li>startedAt = null (awaiting actual exam start)</li>
         </ul>
       </li>
-      <li><strong>Create EventBridge Rules (both flows)</strong>
+      <li><strong>Create EventBridge Start Rule ONLY (both flows)</strong>
         <ul>
-          <li>Start rule: <code>at({publishAt})</code> → triggers handle-scheduled-exam-start (exam begins, students see questions)</li>
-          <li>End rule: <code>at({publishAt + durationMinutes})</code> → triggers handle-scheduled-exam-end (students auto-submit)</li>
-          <li>Both rules have event.examRoomId in input payload</li>
+          <li>Start rule: <code>at({publishAt})</code> → triggers handle-scheduled-exam-start</li>
+          <li><strong>Do NOT create end rule yet</strong> — will be created when exam actually starts (either via EventBridge or manual)</li>
+          <li>Start rule has event.examRoomId in input payload</li>
         </ul>
       </li>
       <li><span class="tag be-tag">Firebase & EventBridge</span> <strong>Both flows:</strong>
         <ul>
           <li>Exam room published immediately (state="WAITING")</li>
-          <li>EventBridge rules created for publishAt (start) and end times</li>
+          <li>Start rule created and waiting at publishAt time</li>
           <li>Students can join waiting room from creation until publishAt</li>
         </ul>
       </li>
       <li><strong>Response</strong>
         <ul>
-          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, endAt (publishAt + durationMinutes)</li>
+          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, durationMinutes</li>
         </ul>
       </li>
     </ol>
-    <div class="check">✓ Flow 1 (startNow=true): publishAt auto-calculated as now+10min → students join immediately in waiting room<br/>✓ Flow 2 (startNow=false): publishAt from teacher → EventBridge rules created for both flows → automatic start/end at scheduled times</div>
+    <div class="check">✓ Flow 1 (startNow=true): publishAt auto-calculated as now+10min → students join waiting room<br/>✓ Flow 2 (startNow=false): publishAt from teacher → start rule created<br/>✓ End rule created lazily (only when exam actually starts) → accurate end time regardless of start method</div>
   </div>
 
-  <h3>POST /start-exam (Teacher) — Flow 1 Only</h3>
+  <h3>POST /exam-rooms/{id}/start (Teacher)</h3>
   <div class="box">
-    <p style="color:var(--m);font-size:12px;margin-bottom:12px;"><strong>Note:</strong> Only if room created with publishNow=true. If publishNow=false (scheduled), DO NOT show this button — scheduler handles state transition.</p>
+    <p style="color:var(--m);font-size:12px;margin-bottom:12px;"><strong>Usage:</strong> Teacher can manually start exam before EventBridge publishAt time. Supports both startNow and scheduled exams.</p>
     <h4>Handler Flow</h4>
     <ol>
       <li>Validate JWT + examRoomId ownership</li>
-      <li>Verify room state = "WAITING" AND publishNow=true</li>
-      <li>Calculate durationMs = durationMinutes * 60_000</li>
-      <li><strong>Update DynamoDB:</strong> Set state→"IN_PROGRESS", startedAt→now()</li>
-      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> with:<pre><code>{
+      <li><strong>Idempotent check:</strong> If state ≠ "WAITING", return 409 (already started or ended)</li>
+      <li><strong>Calculate actual times:</strong>
+        <ul>
+          <li>startedAt = now()</li>
+          <li>endAt = startedAt + durationMinutes</li>
+        </ul>
+      </li>
+      <li><strong>Update DynamoDB:</strong> state→"IN_PROGRESS", startedAt→now(), endedAt→(startedAt + durationMinutes)</li>
+      <li><strong>Create EventBridge End Rule (Lazy Creation):</strong>
+        <ul>
+          <li>Rule name: <code>exam-{examRoomId}-end</code></li>
+          <li>Schedule: <code>at({endAt})</code> → trigger handle-scheduled-exam-end</li>
+          <li>Input: <code>{ examRoomId, action: "END" }</code></li>
+        </ul>
+      </li>
+      <li><strong>Try to delete start rule (if exists):</strong> <code>events:DeleteRule</code> on <code>exam-{examRoomId}-start</code> (may not exist if already fired)</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code><pre><code>{
   "state": "IN_PROGRESS",
   "startedAt": 1705315200000,
   "durationMinutes": 90,
   "eventCount": 0,
   "timestamp": 1705315200000
 }</code></pre></li>
-      <li>Both FE + Unity receive notification via Firebase listener</li>
+      <li>Both FE + Unity receive notification via Firebase listener → timers start, questions display</li>
       <li>Return 200 OK</li>
     </ol>
-    <div class="warning">⚠️ Firebase write targets same node regardless of action. Concurrent /start requests will overwrite each other (OK — idempotent state update).</div>
+    <div class="check">✓ Idempotent (safe to call multiple times)<br/>✓ Handles both auto-start (EventBridge) and manual start<br/>✓ End rule created with accurate time based on actual start</div>
   </div>
 
   <h3>POST /join-exam (Student)</h3>
@@ -323,16 +336,22 @@
     <h4>Purpose</h4>
     <p style="color:var(--m);font-size:12px;margin-bottom:12px;">When teacher creates exam with <code>publishNow=false</code> and <code>publishAt</code> timestamp, EventBridge automatically triggers Lambda handlers at scheduled start time and end time without manual polling.</p>
     
-    <h4>AWS EventBridge + Lambda Architecture</h4>
+    <h4>AWS EventBridge + Lambda Architecture (Lazy End Rule Creation)</h4>
     <ul>
       <li><strong>Teacher creates exam:</strong> <code>POST /exam-rooms</code> with <code>startNow=true</code> or <code>startNow=false + publishAt</code></li>
       <li><strong>Lambda (create-exam-room):</strong>
         <ul>
           <li>Calculate publishAt: if startNow=true, then publishAt = now+10min; else use teacher-provided value</li>
           <li>Save room to DynamoDB with state="WAITING", publishAt={calculated/provided}</li>
-          <li>Create EventBridge rule: <code>at({publishAt})</code> → trigger start-exam-handler</li>
-          <li>Create EventBridge rule: <code>at({publishAt+durationMinutes})</code> → trigger end-exam-handler</li>
-          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, endAt</li>
+          <li><strong>Create START rule only:</strong> <code>at({publishAt})</code> → trigger handle-scheduled-exam-start</li>
+          <li><strong>Do NOT create end rule yet</strong> (will be created when exam actually starts)</li>
+          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, durationMinutes</li>
+        </ul>
+      </li>
+      <li><strong>When exam starts (either path):</strong>
+        <ul>
+          <li><strong>Path A (EventBridge):</strong> At publishAt time, handle-scheduled-exam-start fires → creates end rule with accurate time</li>
+          <li><strong>Path B (Manual):</strong> Teacher calls POST /start before publishAt → creates end rule with accurate time + deletes start rule</li>
         </ul>
       </li>
     </ul>
@@ -349,8 +368,8 @@ Input JSON:
   "action": "START"
 }</code></pre></div>
 
-    <div class="example"><strong>End Exam Rule (EventBridge Cron/One-time)</strong><pre><code>RuleName: "exam-{examRoomId}-end"
-Schedule: "at(2025-01-15T15:30:00)"  // One-time rule (start + 90 min)
+    <div class="example"><strong>End Exam Rule (Created Lazily — when exam actually starts)</strong><pre><code>RuleName: "exam-{examRoomId}-end"
+Schedule: "at({actualStartedAt + durationMinutes})"  // One-time rule
 Target: Lambda function "handle-scheduled-exam-end"
 RoleArn: "arn:aws:iam::ACCOUNT_ID:role/EventBridgeInvokeRole"
 
@@ -358,14 +377,33 @@ Input JSON:
 {
   "examRoomId": "ROOM_456",
   "action": "END"
+}
+
+Note: This rule is created when exam starts (not at room creation):
+- If EventBridge starts it: at publishAt → creates end rule at (publishAt + durationMinutes)
+- If teacher starts it manually: POST /start → creates end rule at (now + durationMinutes)</code></pre></div>
+  "action": "END"
 }</code></pre></div>
 
     <h4>Lambda Handler: handle-scheduled-exam-start</h4>
     <ol>
       <li>Get examRoomId from EventBridge event</li>
       <li>Fetch room from DynamoDB: <code>GET ExamRooms where roomId={examRoomId}</code></li>
-      <li>Verify state="WAITING" (idempotent check)</li>
-      <li><strong>Update DynamoDB:</strong> state→"IN_PROGRESS", startedAt→now(), update TTL</li>
+      <li><strong>Idempotent check:</strong> If state ≠ "WAITING", return 200 (already started manually)</li>
+      <li><strong>Calculate actual times:</strong>
+        <ul>
+          <li>startedAt = now()</li>
+          <li>endAt = startedAt + durationMinutes</li>
+        </ul>
+      </li>
+      <li><strong>Update DynamoDB:</strong> state→"IN_PROGRESS", startedAt→now(), endedAt→(startedAt + durationMinutes)</li>
+      <li><strong>Create EventBridge End Rule (Lazy Creation):</strong>
+        <ul>
+          <li>Rule name: <code>exam-{examRoomId}-end</code></li>
+          <li>Schedule: <code>at({endAt})</code> → trigger handle-scheduled-exam-end</li>
+          <li>Input: <code>{ examRoomId, action: "END" }</code></li>
+        </ul>
+      </li>
       <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code><pre><code>{
   "state": "IN_PROGRESS",
   "startedAt": 1705315200000,
@@ -374,7 +412,7 @@ Input JSON:
   "timestamp": 1705315200000
 }</code></pre></li>
       <li>Students' Firebase listeners fire → timers start, questions display</li>
-      <li>Delete this EventBridge rule (one-time execution)</li>
+      <li>Delete this start rule</li>
       <li>Return 200 OK</li>
     </ol>
 
