@@ -38,6 +38,9 @@
     .err-4{border-color:#f87171;}
     .err-9{border-color:#f87171;}
     .box{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:16px;margin:14px 0;}
+    .status-badge{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;margin-left:8px;}
+    .available{background:rgba(74,222,128,0.2);color:#4ade80;}
+    .coming-soon{background:rgba(249,115,22,0.2);color:#fb923c;}
   </style>
 </head>
 <body>
@@ -56,6 +59,7 @@
   <div class="endpoint open">
     <div class="endpoint-head">
       <span class="method post">POST</span> <code>{IDENTITY_BASE_URL}/v1/identities/login</code>
+      <span class="status-badge available">Available</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -66,7 +70,9 @@
 }</code></pre>
       <div class="field-label">Response (200)</div>
       <pre><code>{
-  "jwt": "eyJhbGciOiJIUzI1NiIs..."
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expiresIn": 86400000,
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
 }</code></pre>
     </div>
   </div>
@@ -130,6 +136,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method post">POST</span> <code>/exam-rooms</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -152,17 +159,55 @@
 
   <div class="endpoint">
     <div class="endpoint-head">
+      <span class="method get">GET</span> <code>/exam-rooms</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
+      <span class="toggle-icon">⌄</span>
+    </div>
+    <div class="endpoint-body">
+      <div class="field-label">Get all exam rooms (dashboard)</div>
+      <pre><code>{
+  "data": [
+    {
+      "examRoomId": "ROOM_456",
+      "roomName": "Math Final",
+      "state": "WAITING",
+      "createdAt": "2025-01-15T10:30:00Z",
+      "startedAt": null,
+      "endedAt": null
+    },
+    {
+      "examRoomId": "ROOM_789",
+      "roomName": "English Quiz",
+      "state": "ENDED",
+      "createdAt": "2025-01-14T14:00:00Z",
+      "startedAt": "2025-01-14T14:15:00Z",
+      "endedAt": "2025-01-14T15:45:00Z"
+    }
+  ]
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-head">
       <span class="method get">GET</span> <code>/exam-rooms/{id}</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
       <div class="field-label">Get room details</div>
       <pre><code>{
-  "id": "ROOM_456",
-  "title": "Math Final",
-  "state": "IN_PROGRESS",
-  "startedAt": "2025-01-15T10:45:00Z",
-  "durationMinutes": 90
+  "data": {
+    "examRoomId": "ROOM_456",
+    "roomName": "Math Final",
+    "subject": "Toán",
+    "grade": "Lớp 6",
+    "state": "IN_PROGRESS",
+    "durationMinutes": 90,
+    "startedAt": "2025-01-15T10:45:00Z",
+    "endedAt": null,
+    "assignmentId": "ASN_123"
+  }
 }</code></pre>
     </div>
   </div>
@@ -172,6 +217,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method post">POST</span> <code>/exam-rooms/{id}/start</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -191,6 +237,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method post">POST</span> <code>/exam-rooms/{id}/end</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -212,6 +259,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method get">GET</span> <code>/exam-rooms/{id}/participants</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -229,6 +277,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method get">GET</span> <code>/exam-rooms/{id}/submissions</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
@@ -245,6 +294,7 @@
   <div class="endpoint">
     <div class="endpoint-head">
       <span class="method get">GET</span> <code>/exam-rooms/{id}/results</code>
+      <span class="status-badge coming-soon">Coming Soon</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
