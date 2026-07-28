@@ -73,7 +73,7 @@
         <tr><td><code>assignmentId</code></td><td>String</td><td>-</td><td>Link to exam questions (max 1)</td></tr>
         <tr><td><code>durationMinutes</code></td><td>Number</td><td>-</td><td>15-180 minutes (from button group or custom)</td></tr>
         <tr><td><code>mode</code></td><td>String</td><td>-</td><td>"auto_advance" or "bell_alert" (Chế độ thi)</td></tr>
-        <tr><td><code>publishAt</code></td><td>Number</td><td>-</td><td>Null if publishNow=true; epoch ms if scheduled (Flow 2). EventBridge rules use this timestamp.</td></tr>
+        <tr><td><code>publishAt</code></td><td>Number</td><td>-</td><td>Epoch ms when exam actually starts (students see questions). If startNow=true, Lambda calculates as now+10min. If startNow=false, teacher provides it.</td></tr>
         <tr><td><code>createdAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
         <tr><td><code>startedAt</code></td><td>Number</td><td>-</td><td>When state → IN_PROGRESS (Lambda or scheduler)</td></tr>
         <tr><td><code>endedAt</code></td><td>Number</td><td>-</td><td>When state → ENDED</td></tr>
@@ -124,7 +124,7 @@
 
   <h3>POST /create-exam-room</h3>
   <div class="box">
-    <h4>Request Body (Flow 1: Immediate)</h4>
+    <h4>Request Body (Flow 1: Start Now)</h4>
     <pre><code>{
   "roomName": "Kiểm tra Toán Chương 3",
   "subject": "Toán",
@@ -132,10 +132,11 @@
   "durationMinutes": 60,
   "mode": "auto_advance",
   "assignmentId": "assign123",
-  "publishNow": true
+  "startNow": true
 }</code></pre>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Lambda auto-calculates:</strong> publishAt = UTC now + 10 minutes (students can join waiting room during this 10-min buffer)</p>
 
-    <h4>Request Body (Flow 2: Scheduled)</h4>
+    <h4>Request Body (Flow 2: Scheduled Start)</h4>
     <pre><code>{
   "roomName": "Kiểm tra Toán Chương 3",
   "subject": "Toán",
@@ -143,9 +144,10 @@
   "durationMinutes": 60,
   "mode": "auto_advance",
   "assignmentId": "assign123",
-  "publishNow": false,
+  "startNow": false,
   "publishAt": "2025-01-15T14:00:00Z"
 }</code></pre>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Teacher specifies:</strong> publishAt timestamp (students can join from this time until exam end)</p>
 
     <h4>Handler Flow</h4>
     <ol>
@@ -153,7 +155,7 @@
         <ul>
           <li>JWT → extract teacherId</li>
           <li>Fields: roomName, subject, grade, durationMinutes (15-180), mode, assignmentId</li>
-          <li>If publishNow=false: verify publishAt is ISO 8601 timestamp in the future</li>
+          <li>If startNow=false: verify publishAt is ISO 8601 timestamp in the future</li>
         </ul>
       </li>
       <li><strong>External Validation</strong>
@@ -170,33 +172,33 @@
       </li>
       <li><strong>Create DynamoDB</strong>
         <ul>
-          <li>state = "WAITING" (both flows)</li>
-          <li>If publishNow=true: startedAt=now(), Firebase write immediately</li>
-          <li>If publishNow=false: publishAt={provided}, startedAt=null, endedAt=null (awaiting EventBridge)</li>
+          <li>state = "WAITING" (both flows) — room is now published/created</li>
+          <li>If startNow=true: publishAt = now + 10 minutes (auto-calculated by Lambda)</li>
+          <li>If startNow=false: publishAt = teacher-provided timestamp</li>
+          <li>Create EventBridge rules for publishAt and (publishAt + durationMinutes)</li>
         </ul>
       </li>
-      <li><strong>Create EventBridge Rules (Flow 2 only)</strong>
+      <li><strong>Create EventBridge Rules (both flows)</strong>
         <ul>
-          <li>Start rule: <code>at({publishAt})</code> → triggers handle-scheduled-exam-start</li>
-          <li>End rule: <code>at({publishAt + durationMinutes})</code> → triggers handle-scheduled-exam-end</li>
+          <li>Start rule: <code>at({publishAt})</code> → triggers handle-scheduled-exam-start (exam begins, students see questions)</li>
+          <li>End rule: <code>at({publishAt + durationMinutes})</code> → triggers handle-scheduled-exam-end (students auto-submit)</li>
           <li>Both rules have event.examRoomId in input payload</li>
         </ul>
       </li>
-      <li><span class="tag be-tag">Firebase & EventBridge</span> <strong>Conditional</strong>
+      <li><span class="tag be-tag">Firebase & EventBridge</span> <strong>Both flows:</strong>
         <ul>
-          <li><strong>Flow 1 (publishNow=true):</strong> Write to Firebase state node immediately → students can join + see countdown</li>
-          <li><strong>Flow 2 (publishNow=false):</strong> Create 2 EventBridge rules for scheduled start/end times → don't write to Firebase yet</li>
+          <li>Exam room published immediately (state="WAITING")</li>
+          <li>EventBridge rules created for publishAt (start) and end times</li>
+          <li>Students can join waiting room from creation until publishAt</li>
         </ul>
       </li>
       <li><strong>Response</strong>
         <ul>
-          <li>Return 201: examRoomId, joinCode, state, scheduledStartAt</li>
-          <li>FE Flow 1: Redirect to Waiting Room</li>
-          <li>FE Flow 2: Show success popup with room code + copy button</li>
+          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, endAt (publishAt + durationMinutes)</li>
         </ul>
       </li>
     </ol>
-    <div class="check">✓ Flow 1: publishNow=true → Firebase write now → students can join immediately<br/>✓ Flow 2: publishNow=false → EventBridge rules created → automatic start/end at scheduled times → no manual scheduler needed</div>
+    <div class="check">✓ Flow 1 (startNow=true): publishAt auto-calculated as now+10min → students join immediately in waiting room<br/>✓ Flow 2 (startNow=false): publishAt from teacher → EventBridge rules created for both flows → automatic start/end at scheduled times</div>
   </div>
 
   <h3>POST /start-exam (Teacher) — Flow 1 Only</h3>
@@ -323,13 +325,14 @@
     
     <h4>AWS EventBridge + Lambda Architecture</h4>
     <ul>
-      <li><strong>Teacher creates exam:</strong> <code>POST /exam-rooms</code> with <code>publishAt="2025-01-15T14:00:00Z"</code></li>
+      <li><strong>Teacher creates exam:</strong> <code>POST /exam-rooms</code> with <code>startNow=true</code> or <code>startNow=false + publishAt</code></li>
       <li><strong>Lambda (create-exam-room):</strong>
         <ul>
-          <li>Save room to DynamoDB with state="WAITING", scheduledStartAt=1705315200000</li>
-          <li>Create EventBridge rule: <code>at(2025-01-15T14:00:00)</code> → trigger start-exam-handler</li>
-          <li>Create EventBridge rule: <code>at(2025-01-15T15:30:00)</code> → trigger end-exam-handler (startTime + durationMinutes)</li>
-          <li>Return: examRoomId, joinCode, status="SCHEDULED"</li>
+          <li>Calculate publishAt: if startNow=true, then publishAt = now+10min; else use teacher-provided value</li>
+          <li>Save room to DynamoDB with state="WAITING", publishAt={calculated/provided}</li>
+          <li>Create EventBridge rule: <code>at({publishAt})</code> → trigger start-exam-handler</li>
+          <li>Create EventBridge rule: <code>at({publishAt+durationMinutes})</code> → trigger end-exam-handler</li>
+          <li>Return 201 Created: examRoomId, joinCode, status="PUBLISHED", publishAt, endAt</li>
         </ul>
       </li>
     </ul>
@@ -392,26 +395,35 @@ Input JSON:
       <li>Return 200 OK</li>
     </ol>
 
-    <h4>POST /exam-rooms with Scheduled Mode</h4>
-    <div class="example"><strong>Request (Scheduled)</strong><pre><code>POST /exam-rooms
+    <h4>POST /exam-rooms Request Examples</h4>
+    <div class="example"><strong>Flow 1: Start Now (auto-calculate publishAt = now + 10min)</strong><pre><code>POST /exam-rooms
 {
-  "title": "Math Final",
+  "roomName": "Math Final",
   "assignmentId": "ASS_123",
   "durationMinutes": 90,
-  "publishNow": false,
+  "startNow": true
+}</code></pre></div>
+
+    <div class="example"><strong>Flow 2: Scheduled Start (teacher specifies publishAt)</strong><pre><code>POST /exam-rooms
+{
+  "roomName": "Math Final",
+  "assignmentId": "ASS_123",
+  "durationMinutes": 90,
+  "startNow": false,
   "publishAt": "2025-01-15T14:00:00Z"  // ISO 8601 format
 }</code></pre></div>
 
-    <div class="example"><strong>Response (Scheduled)</strong><pre><code>{
+    <div class="example"><strong>Response (Both Flows)</strong><pre><code>{
   "data": {
     "examRoomId": "ROOM_456",
     "joinCode": "ABC123",
-    "status": "SCHEDULED",
-    "scheduledStart": "2025-01-15T14:00:00Z",
-    "scheduledEnd": "2025-01-15T15:30:00Z",
-    "studentCanJoinAt": "2025-01-15T14:00:00Z"
+    "status": "PUBLISHED",
+    "publishAt": "2025-01-15T14:10:00Z",
+    "endAt": "2025-01-15T15:40:00Z",
+    "studentCanJoinAt": "2025-01-15T14:10:00Z"
   }
-}</code></pre></div>
+}</code></pre>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;">Note: Exam room is published immediately. Students can join from now until publishAt. Exam questions appear at publishAt.</p></div>
 
     <div class="check">✓ EventBridge handles automatic state transitions at exact scheduled times<br/>✓ No polling/scanning overhead (event-driven)<br/>✓ Multiple exams can run simultaneously with independent schedules<br/>✓ Idempotent handlers prevent double-triggering<br/>✓ One-time rules auto-delete after execution</div>
 
