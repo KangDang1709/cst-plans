@@ -73,7 +73,7 @@
         <tr><td><code>assignmentId</code></td><td>String</td><td>-</td><td>Link to exam questions (max 1)</td></tr>
         <tr><td><code>durationMinutes</code></td><td>Number</td><td>-</td><td>15-180 minutes (from button group or custom)</td></tr>
         <tr><td><code>mode</code></td><td>String</td><td>-</td><td>"auto_advance" or "bell_alert" (Chế độ thi)</td></tr>
-        <tr><td><code>scheduledStartAt</code></td><td>Number</td><td>-</td><td>Null if publish now; epoch ms if scheduled (Flow 2)</td></tr>
+        <tr><td><code>publishAt</code></td><td>Number</td><td>-</td><td>Null if publishNow=true; epoch ms if scheduled (Flow 2). EventBridge rules use this timestamp.</td></tr>
         <tr><td><code>createdAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
         <tr><td><code>startedAt</code></td><td>Number</td><td>-</td><td>When state → IN_PROGRESS (Lambda or scheduler)</td></tr>
         <tr><td><code>endedAt</code></td><td>Number</td><td>-</td><td>When state → ENDED</td></tr>
@@ -124,7 +124,7 @@
 
   <h3>POST /create-exam-room</h3>
   <div class="box">
-    <h4>Request Body (from US-2 Modal)</h4>
+    <h4>Request Body (Flow 1: Immediate)</h4>
     <pre><code>{
   "roomName": "Kiểm tra Toán Chương 3",
   "subject": "Toán",
@@ -132,8 +132,19 @@
   "durationMinutes": 60,
   "mode": "auto_advance",
   "assignmentId": "assign123",
-  "publishNow": true,
-  "scheduledStartAt": null
+  "publishNow": true
+}</code></pre>
+
+    <h4>Request Body (Flow 2: Scheduled)</h4>
+    <pre><code>{
+  "roomName": "Kiểm tra Toán Chương 3",
+  "subject": "Toán",
+  "grade": "Lớp 6",
+  "durationMinutes": 60,
+  "mode": "auto_advance",
+  "assignmentId": "assign123",
+  "publishNow": false,
+  "publishAt": "2025-01-15T14:00:00Z"
 }</code></pre>
 
     <h4>Handler Flow</h4>
@@ -142,7 +153,7 @@
         <ul>
           <li>JWT → extract teacherId</li>
           <li>Fields: roomName, subject, grade, durationMinutes (15-180), mode, assignmentId</li>
-          <li>If publishNow=false: verify scheduledStartAt is future timestamp</li>
+          <li>If publishNow=false: verify publishAt is ISO 8601 timestamp in the future</li>
         </ul>
       </li>
       <li><strong>External Validation</strong>
@@ -160,14 +171,21 @@
       <li><strong>Create DynamoDB</strong>
         <ul>
           <li>state = "WAITING" (both flows)</li>
-          <li>If publishNow=true: startedAt=now() (teacher enters waiting room 10 min early)</li>
-          <li>If publishNow=false: scheduledStartAt=provided, startedAt=null (await scheduler)</li>
+          <li>If publishNow=true: startedAt=now(), Firebase write immediately</li>
+          <li>If publishNow=false: publishAt={provided}, startedAt=null, endedAt=null (awaiting EventBridge)</li>
         </ul>
       </li>
-      <li><span class="tag be-tag">Firebase</span> <strong>Conditional</strong>
+      <li><strong>Create EventBridge Rules (Flow 2 only)</strong>
         <ul>
-          <li><strong>Flow 1 (publishNow=true):</strong> Write to state node with startedAt + durationMinutes</li>
-          <li><strong>Flow 2 (publishNow=false):</strong> NO WRITE (wait for scheduled time)</li>
+          <li>Start rule: <code>at({publishAt})</code> → triggers handle-scheduled-exam-start</li>
+          <li>End rule: <code>at({publishAt + durationMinutes})</code> → triggers handle-scheduled-exam-end</li>
+          <li>Both rules have event.examRoomId in input payload</li>
+        </ul>
+      </li>
+      <li><span class="tag be-tag">Firebase & EventBridge</span> <strong>Conditional</strong>
+        <ul>
+          <li><strong>Flow 1 (publishNow=true):</strong> Write to Firebase state node immediately → students can join + see countdown</li>
+          <li><strong>Flow 2 (publishNow=false):</strong> Create 2 EventBridge rules for scheduled start/end times → don't write to Firebase yet</li>
         </ul>
       </li>
       <li><strong>Response</strong>
@@ -178,7 +196,7 @@
         </ul>
       </li>
     </ol>
-    <div class="check">✓ Flow 1: publishNow=true → Firebase write now → students can join<br/>✓ Flow 2: publishNow=false → Lambda scheduler monitors scheduledStartAt → Firebase write at time</div>
+    <div class="check">✓ Flow 1: publishNow=true → Firebase write now → students can join immediately<br/>✓ Flow 2: publishNow=false → EventBridge rules created → automatic start/end at scheduled times → no manual scheduler needed</div>
   </div>
 
   <h3>POST /start-exam (Teacher) — Flow 1 Only</h3>
@@ -298,45 +316,107 @@
     </ol>
   </div>
 
-  <h3>Scheduled Exam Processor (Flow 2 — publishNow=false)</h3>
+  <h3>Scheduled Exam Processor (Flow 2 — publishNow=false with EventBridge)</h3>
   <div class="box">
     <h4>Purpose</h4>
-    <p style="color:var(--m);font-size:12px;margin-bottom:12px;">Periodically checks for exams with scheduledStartAt in the past + state=WAITING. When scheduled time arrives, automatically transitions state → IN_PROGRESS and writes to Firebase.</p>
+    <p style="color:var(--m);font-size:12px;margin-bottom:12px;">When teacher creates exam with <code>publishNow=false</code> and <code>publishAt</code> timestamp, EventBridge automatically triggers Lambda handlers at scheduled start time and end time without manual polling.</p>
     
-    <h4>Implementation Options</h4>
+    <h4>AWS EventBridge + Lambda Architecture</h4>
     <ul>
-      <li><strong>Option 1: CloudWatch Event + Lambda (AWS Native)</strong>
+      <li><strong>Teacher creates exam:</strong> <code>POST /exam-rooms</code> with <code>publishAt="2025-01-15T14:00:00Z"</code></li>
+      <li><strong>Lambda (create-exam-room):</strong>
         <ul>
-          <li>CloudWatch rule: Trigger every 1 minute</li>
-          <li>Lambda: Query ExamRooms where scheduledStartAt ≤ now() AND state=WAITING</li>
-          <li>For each: Update state→IN_PROGRESS, write to Firebase</li>
-          <li>Cost: ~43K invocations/month = ~$1 (minimal)</li>
-        </ul>
-      </li>
-      <li><strong>Option 2: DynamoDB Streams (Event-Driven)</strong>
-        <ul>
-          <li>Monitor room creation events</li>
-          <li>Lambda: Register scheduledStartAt in SQS/SNS delayed queue</li>
-          <li>Trigger handler at scheduled time</li>
-          <li>More complex setup, better for high throughput</li>
+          <li>Save room to DynamoDB with state="WAITING", scheduledStartAt=1705315200000</li>
+          <li>Create EventBridge rule: <code>at(2025-01-15T14:00:00)</code> → trigger start-exam-handler</li>
+          <li>Create EventBridge rule: <code>at(2025-01-15T15:30:00)</code> → trigger end-exam-handler (startTime + durationMinutes)</li>
+          <li>Return: examRoomId, joinCode, status="SCHEDULED"</li>
         </ul>
       </li>
     </ul>
 
-    <h4>Processor Handler Flow</h4>
+    <h4>EventBridge Rule Configuration</h4>
+    <div class="example"><strong>Start Exam Rule (EventBridge Cron/One-time)</strong><pre><code>RuleName: "exam-{examRoomId}-start"
+Schedule: "at(2025-01-15T14:00:00)"  // One-time rule
+Target: Lambda function "handle-scheduled-exam-start"
+RoleArn: "arn:aws:iam::ACCOUNT_ID:role/EventBridgeInvokeRole"
+
+Input JSON:
+{
+  "examRoomId": "ROOM_456",
+  "action": "START"
+}</code></pre></div>
+
+    <div class="example"><strong>End Exam Rule (EventBridge Cron/One-time)</strong><pre><code>RuleName: "exam-{examRoomId}-end"
+Schedule: "at(2025-01-15T15:30:00)"  // One-time rule (start + 90 min)
+Target: Lambda function "handle-scheduled-exam-end"
+RoleArn: "arn:aws:iam::ACCOUNT_ID:role/EventBridgeInvokeRole"
+
+Input JSON:
+{
+  "examRoomId": "ROOM_456",
+  "action": "END"
+}</code></pre></div>
+
+    <h4>Lambda Handler: handle-scheduled-exam-start</h4>
     <ol>
-      <li>Query DynamoDB: <code>SELECT * FROM ExamRooms WHERE scheduledStartAt ≤ now() AND state='WAITING'</code></li>
-      <li>For each room:
-        <ul>
-          <li>Update: state→"IN_PROGRESS", startedAt→now()</li>
-          <li><span class="tag be-tag">Firebase WRITE:</span> Update state node with startedAt + durationMinutes</li>
-          <li>Both FE + Unity get notifications instantly</li>
-        </ul>
-      </li>
-      <li>Log processed rooms for monitoring</li>
+      <li>Get examRoomId from EventBridge event</li>
+      <li>Fetch room from DynamoDB: <code>GET ExamRooms where roomId={examRoomId}</code></li>
+      <li>Verify state="WAITING" (idempotent check)</li>
+      <li><strong>Update DynamoDB:</strong> state→"IN_PROGRESS", startedAt→now(), update TTL</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code><pre><code>{
+  "state": "IN_PROGRESS",
+  "startedAt": 1705315200000,
+  "durationMinutes": 90,
+  "eventCount": 0,
+  "timestamp": 1705315200000
+}</code></pre></li>
+      <li>Students' Firebase listeners fire → timers start, questions display</li>
+      <li>Delete this EventBridge rule (one-time execution)</li>
+      <li>Return 200 OK</li>
     </ol>
 
-    <div class="check">✓ Automatic state transition at scheduled time<br/>✓ Students see Firebase notification and can start exam<br/>✓ Teacher can also manually call POST /start-exam if needed</div>
+    <h4>Lambda Handler: handle-scheduled-exam-end</h4>
+    <ol>
+      <li>Get examRoomId from EventBridge event</li>
+      <li>Fetch room from DynamoDB: <code>GET ExamRooms where roomId={examRoomId}</code></li>
+      <li>Verify state="IN_PROGRESS" (idempotent check)</li>
+      <li><strong>Update DynamoDB:</strong> state→"ENDED", endedAt→now()</li>
+      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code><pre><code>{
+  "state": "ENDED",
+  "endedAt": 1705322100000,
+  "timestamp": 1705322100000
+}</code></pre></li>
+      <li>Students' Firebase listeners fire → auto-submit pending answers automatically</li>
+      <li>Teacher can now call <code>GET /results</code> to see final leaderboard</li>
+      <li>Delete this EventBridge rule (one-time execution)</li>
+      <li>Return 200 OK</li>
+    </ol>
+
+    <h4>POST /exam-rooms with Scheduled Mode</h4>
+    <div class="example"><strong>Request (Scheduled)</strong><pre><code>POST /exam-rooms
+{
+  "title": "Math Final",
+  "assignmentId": "ASS_123",
+  "durationMinutes": 90,
+  "publishNow": false,
+  "publishAt": "2025-01-15T14:00:00Z"  // ISO 8601 format
+}</code></pre></div>
+
+    <div class="example"><strong>Response (Scheduled)</strong><pre><code>{
+  "data": {
+    "examRoomId": "ROOM_456",
+    "joinCode": "ABC123",
+    "status": "SCHEDULED",
+    "scheduledStart": "2025-01-15T14:00:00Z",
+    "scheduledEnd": "2025-01-15T15:30:00Z",
+    "studentCanJoinAt": "2025-01-15T14:00:00Z"
+  }
+}</code></pre></div>
+
+    <div class="check">✓ EventBridge handles automatic state transitions at exact scheduled times<br/>✓ No polling/scanning overhead (event-driven)<br/>✓ Multiple exams can run simultaneously with independent schedules<br/>✓ Idempotent handlers prevent double-triggering<br/>✓ One-time rules auto-delete after execution</div>
+
+    <h4>Fallback: Manual Override</h4>
+    <p style="color:var(--m);font-size:12px;margin-top:8px;">Teacher can still manually call <code>POST /exam-rooms/{id}/start</code> or <code>POST /exam-rooms/{id}/end</code> even if scheduled (overrides EventBridge).</p>
   </div>
 
   <h2>3. Firebase Realtime Database Setup</h2>
@@ -409,11 +489,20 @@ async function updateExamState(examRoomId: string, state: any) {
     <h4>IAM Permissions (Lambda Execution Role)</h4>
     <ul>
       <li><code>dynamodb:PutItem</code>, <code>dynamodb:UpdateItem</code>, <code>dynamodb:GetItem</code>, <code>dynamodb:Query</code> on ExamRooms, ExamParticipants</li>
+      <li><code>events:PutRule</code>, <code>events:PutTargets</code>, <code>events:DeleteRule</code>, <code>events:RemoveTargets</code> for EventBridge rule creation/cleanup</li>
+      <li><code>lambda:InvokeFunction</code> on self (for EventBridge to invoke handlers)</li>
       <li>Call Assignment Service to store submissions (no direct ExamSubmissions access)</li>
       <li><code>dynamodb:GetItem</code> with GSI on joinCode</li>
       <li>No S3 needed (questions fetched from Assignment Service)</li>
     </ul>
   </div>
+
+  <h3>IAM Permissions (EventBridge Service Role)</h3>
+  <div class="box">
+    <ul>
+      <li><code>lambda:InvokeFunction</code> on Lambda handlers: handle-scheduled-exam-start, handle-scheduled-exam-end</li>
+      <li>Trust relationship: Allow service.events.amazonaws.com</li>
+    </ul>
 
   <h3>DynamoDB Indexing</h3>
   <div class="box">
