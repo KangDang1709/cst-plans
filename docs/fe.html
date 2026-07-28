@@ -281,13 +281,32 @@
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
-      <div class="field-label">Get all submissions</div>
+      <div class="field-label">Get all submissions (from Assignment Service via exam_room_id GSI)</div>
       <pre><code>{
-  "submissions": [
-    { "studentId": "STU_001", "submittedAt": "2025-01-15T12:10:00Z", "score": 85 },
-    { "studentId": "STU_002", "submittedAt": "2025-01-15T12:12:00Z", "score": 92 }
-  ]
+  "data": {
+    "submissions": [
+      { 
+        "submissionId": "SUB_001",
+        "username": "cr7",
+        "score": 85,
+        "total_score": 100,
+        "complete_time": 1800,
+        "submitted_at": 1705315800000,
+        "is_late": false
+      },
+      { 
+        "submissionId": "SUB_002",
+        "username": "messi",
+        "score": 92,
+        "total_score": 100,
+        "complete_time": 1750,
+        "submitted_at": 1705315920000,
+        "is_late": false
+      }
+    ]
+  }
 }</code></pre>
+      <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Backend:</strong> Queries Assignment Service submissions table using exam_room_id GSI. Returns unified submission records (both study and exam submissions).</p>
     </div>
   </div>
 

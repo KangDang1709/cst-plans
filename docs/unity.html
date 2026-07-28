@@ -246,23 +246,34 @@
 
   <div class="endpoint open">
     <div class="endpoint-head">
-      <span class="method post">POST</span> <code>/exam-rooms/{id}/submit</code>
-      <span class="status-badge coming-soon">Coming Soon</span>
+      <span class="method post">POST</span> <code>{ASSIGNMENT_BASE_URL}/v1/assignments/{assignmentId}/submissions</code>
+      <span class="status-badge available">Available</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
-      <div class="field-label">Request</div>
+      <div class="field-label">Request (Submit all answers)</div>
       <pre><code>{
-  "questionId": "Q_001",
-  "answer": "4"
+  "exam_room_id": "ROOM_456",
+  "score": 85,
+  "total_score": 100,
+  "complete_time": 1800,
+  "answer_details": {
+    "Q_001": "4",
+    "Q_002": "Paris",
+    "Q_003": "true"
+  },
+  "is_late": false
 }</code></pre>
       <div class="field-label">Response (200)</div>
       <pre><code>{
-  "questionId": "Q_001",
-  "received": true
+  "data": {
+    "submissionId": "SUB_789",
+    "message": "OK"
+  }
 }</code></pre>
       <div class="field-label">Side effect:</div>
-      <p>Lambda writes to Firebase → Teacher gets notified (submission count increases)</p>
+      <p>Exam Service receives response → updates ExamParticipants → writes to Firebase → Teacher gets notified (submission count increases)</p>
+      <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Note:</strong> Score is calculated by Exam Service before calling this endpoint. Submission is stored in unified Assignment Service table for both study and exam contexts.</p>
     </div>
   </div>
 

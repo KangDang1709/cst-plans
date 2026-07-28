@@ -81,19 +81,27 @@
     </table>
   </div>
 
-  <h3>ExamSubmissions Table</h3>
-  <div class="table-box">
-    <table>
-      <thead><tr><th>Field</th><th>Type</th><th>Key</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td><code>submissionId</code></td><td>String</td><td>PK</td><td>UUID</td></tr>
-        <tr><td><code>examRoomId</code></td><td>String</td><td>SK</td><td>From room (enables LSI/GSI)</td></tr>
-        <tr><td><code>studentId</code></td><td>String</td><td>-</td><td>From auth token</td></tr>
-        <tr><td><code>answers</code></td><td>Map</td><td>-</td><td><code>{ questionId: answer, ... }</code></td></tr>
-        <tr><td><code>submittedAt</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
-        <tr><td><code>isLate</code></td><td>Boolean</td><td>-</td><td>Submitted after exam end</td></tr>
-      </tbody>
-    </table>
+  <h3>Assignment Service Submissions (Unified)</h3>
+  <div class="box">
+    <p style="color:var(--m);font-size:12px;margin-bottom:12px;"><strong>Note:</strong> Exam submissions reuse the Assignment Service submissions endpoint. The Assignment Service stores both study submissions (book_id) and exam submissions (exam_room_id).</p>
+    <div class="table-box">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Key</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>submissionId</code></td><td>String</td><td>PK</td><td>UUID</td></tr>
+          <tr><td><code>assignmentId</code></td><td>String</td><td>SK</td><td>Assignment reference</td></tr>
+          <tr><td><code>book_id</code></td><td>String</td><td>-</td><td>Optional - for study materials only</td></tr>
+          <tr><td><code>exam_room_id</code></td><td>String</td><td>GSI</td><td><strong>Optional - for exam submissions only</strong></td></tr>
+          <tr><td><code>username</code></td><td>String</td><td>-</td><td>Student identifier</td></tr>
+          <tr><td><code>score</code></td><td>Number</td><td>-</td><td>Calculated exam score</td></tr>
+          <tr><td><code>total_score</code></td><td>Number</td><td>-</td><td>Max possible score</td></tr>
+          <tr><td><code>complete_time</code></td><td>Number</td><td>-</td><td>Time spent (seconds)</td></tr>
+          <tr><td><code>answer_details</code></td><td>Map</td><td>-</td><td><code>{ questionId: answer, ... }</code></td></tr>
+          <tr><td><code>submitted_at</code></td><td>Number</td><td>-</td><td>Epoch timestamp (ms)</td></tr>
+          <tr><td><code>is_late</code></td><td>Boolean</td><td>-</td><td>Optional - submitted after exam end</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <h3>ExamParticipants Table</h3>
@@ -217,10 +225,21 @@
   <div class="box">
     <h4>Handler Flow</h4>
     <ol>
-      <li>Validate JWT (student token)</li>
+      <li>Validate JWT (student token) → extract username</li>
       <li>Verify room state = "IN_PROGRESS" (can submit during exam only)</li>
-      <li>Validate answers against Assignment Service: <code>GET /assignments/{assignmentId}/questions</code></li>
-      <li><strong>Write DynamoDB ExamSubmissions:</strong> Create submission record with timestamp</li>
+      <li>Get assignment questions: <code>GET /assignments/{assignmentId}/questions</code></li>
+      <li>Validate answers against question types</li>
+      <li>Calculate score based on correct answers</li>
+      <li>Calculate complete_time = (now - startedAt) in seconds</li>
+      <li>Check if submitted after exam end: <code>is_late = (now > startedAt + durationMinutes)</code></li>
+      <li><strong>Call Assignment Service:</strong> <code>POST /v1/assignments/{assignmentId}/submissions</code><pre><code>{
+  "exam_room_id": "ROOM_456",
+  "score": 85,
+  "total_score": 100,
+  "complete_time": 1800,
+  "answer_details": { "q1": "A", "q2": "B" },
+  "is_late": false
+}</code></pre></li>
       <li><strong>Update DynamoDB ExamParticipants:</strong> Set hasSubmitted=true, submittedAt=now()</li>
       <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> (increment eventCount)<pre><code>{
   "state": "IN_PROGRESS",
@@ -230,9 +249,9 @@
   "timestamp": 1705315350000
 }</code></pre></li>
       <li>Teacher receives Firebase notification → calls <code>GET /participants</code> → sees submission count increased</li>
-      <li>Return 201 Created + submissionId</li>
+      <li>Return 201 Created + submissionId (from Assignment Service response)</li>
     </ol>
-    <div class="warning">⚠️ Concurrent submissions (CR7 + Messi at same time) both target same Firebase node. Last write wins — but eventCount may not increment properly. Consider: atomically increment eventCount in Lambda BEFORE writing to Firebase.</div>
+    <div class="check">✓ Submissions stored in unified Assignment Service table<br/>✓ Query exams via <code>exam_room_id</code> GSI<br/>✓ Exam context preserved for leaderboard calculations</div>
   </div>
 
   <h3>POST /end-exam (Teacher)</h3>
@@ -371,7 +390,6 @@ async function updateExamState(examRoomId: string, state: any) {
     <h4>Environment Variables</h4>
     <ul>
       <li><code>DYNAMODB_EXAM_ROOMS_TABLE</code> = "ExamRooms"</li>
-      <li><code>DYNAMODB_EXAM_SUBMISSIONS_TABLE</code> = "ExamSubmissions"</li>
       <li><code>DYNAMODB_EXAM_PARTICIPANTS_TABLE</code> = "ExamParticipants"</li>
       <li><code>FIREBASE_DB_URL</code> = "https://your-project.firebaseio.com"</li>
       <li><code>FIREBASE_CREDENTIALS</code> = JSON service account key</li>
@@ -390,7 +408,8 @@ async function updateExamState(examRoomId: string, state: any) {
 
     <h4>IAM Permissions (Lambda Execution Role)</h4>
     <ul>
-      <li><code>dynamodb:PutItem</code>, <code>dynamodb:UpdateItem</code>, <code>dynamodb:GetItem</code>, <code>dynamodb:Query</code> on ExamRooms, ExamSubmissions, ExamParticipants</li>
+      <li><code>dynamodb:PutItem</code>, <code>dynamodb:UpdateItem</code>, <code>dynamodb:GetItem</code>, <code>dynamodb:Query</code> on ExamRooms, ExamParticipants</li>
+      <li>Call Assignment Service to store submissions (no direct ExamSubmissions access)</li>
       <li><code>dynamodb:GetItem</code> with GSI on joinCode</li>
       <li>No S3 needed (questions fetched from Assignment Service)</li>
     </ul>
