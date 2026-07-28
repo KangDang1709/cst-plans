@@ -213,23 +213,22 @@
     </div>
   </div>
 
-  <h2>4. Get Exam Questions</h2>
+  <h2>4. Get Exam Questions & Listen to State</h2>
 
   <div class="endpoint open">
     <div class="endpoint-head">
-      <span class="method get">GET</span> <code>/exam-rooms/{id}/questions</code>
-      <span class="status-badge coming-soon">Coming Soon</span>
+      <span class="method get">GET</span> <code>{ASSIGNMENT_BASE_URL}/v1/assignments/{assignmentId}/questions</code>
+      <span class="status-badge available">Available</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
-      <div class="field-label">Get all questions with S3 pre-signed URLs</div>
+      <div class="field-label">Response (200)</div>
       <pre><code>{
-  "questions": [
+  "data": [
     {
       "questionId": "Q_001",
-      "text": "2 + 2 = ?",
+      "text": "What is 2 + 2?",
       "type": "multiple_choice",
-      "imageUrl": "https://s3.amazonaws.com/bucket/...",
       "options": ["3", "4", "5"]
     },
     {
@@ -239,6 +238,13 @@
     }
   ]
 }</code></pre>
+      <div class="field-label" style="margin-top:12px;">Firebase Listener (exam-rooms/{roomId}/state)</div>
+      <p style="color:var(--m);font-size:12px;margin:8px 0;"><strong>Monitor these state changes:</strong></p>
+      <ul style="color:var(--m);font-size:12px;margin:4px 0 0 18px;">
+        <li>state = "WAITING" → Show waiting room (no timer, no questions)</li>
+        <li>state = "IN_PROGRESS" → Show questions + timer (remainingSeconds = (startedAt + durationMinutes×60_000 - now) / 1000)</li>
+        <li><strong>state = "ENDED" → Auto-submit all pending answers immediately</strong> (no manual button needed)</li>
+      </ul>
     </div>
   </div>
 

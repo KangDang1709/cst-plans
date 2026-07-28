@@ -131,7 +131,19 @@
 }</code></pre>
   </div>
 
-  <h2>3. Exam Room Endpoints</h2>
+  <h2>3. Participant Visibility & Submission Counter</h2>
+  <div class="box">
+    <p style="color:var(--m);font-size:12px;margin-bottom:8px;"><strong>Exam Timeline:</strong></p>
+    <ul style="color:var(--m);font-size:12px;margin:0 0 12px 18px;">
+      <li>✅ <strong>BEFORE exam starts:</strong> Teacher sees joined participants immediately (no state change required)</li>
+      <li>🎬 <strong>Teacher clicks "Start":</strong> Firebase state → "IN_PROGRESS" (timer begins for students, students see questions)</li>
+      <li>📤 <strong>Each student submission:</strong> Lambda increments eventCount in Firebase (notification signal to teacher)</li>
+      <li>⏹️ <strong>Teacher clicks "End":</strong> Firebase state → "ENDED" (students auto-submit pending answers)</li>
+    </ul>
+    <p style="color:var(--m);font-size:12px;"><strong>eventCount mechanism:</strong> When students submit, eventCount increments → teacher's Firebase listener fires → teacher's UI calls GET /participants → sees updated submission counts in real-time.</p>
+  </div>
+
+  <h2>4. Exam Room Endpoints</h2>
 
   <div class="endpoint">
     <div class="endpoint-head">
