@@ -254,37 +254,21 @@
     </ol>
   </div>
 
-  <h3>POST /submit-answers (Student)</h3>
+  <h3>Student Submission Flow (via Assignment Service)</h3>
   <div class="box">
-    <h4>Handler Flow</h4>
+    <h4>How It Works</h4>
+    <p style="color:var(--m);font-size:13px;margin-bottom:12px;">Students submit directly to Assignment Service endpoint with <code>exam_room_id</code> to distinguish exam submissions from book study submissions.</p>
+    <h4>Endpoint: POST /v1/assignments/{assignmentId}/submissions</h4>
     <ol>
-      <li>Validate JWT (student token) → extract username</li>
-      <li>Verify room state = "IN_PROGRESS" (can submit during exam only)</li>
-      <li>Get assignment questions: <code>GET /assignments/{assignmentId}/questions</code></li>
-      <li>Validate answers against question types</li>
-      <li>Calculate score based on correct answers</li>
-      <li>Calculate complete_time = (now - startedAt) in seconds</li>
-      <li>Check if submitted after exam end: <code>is_late = (now > startedAt + durationMinutes)</code></li>
-      <li><strong>Call Assignment Service:</strong> <code>POST /v1/assignments/{assignmentId}/submissions</code><pre><code>{
-  "exam_room_id": "ROOM_456",
-  "score": 85,
-  "total_score": 100,
-  "complete_time": 1800,
-  "answer_details": { "q1": "A", "q2": "B" },
-  "is_late": false
-}</code></pre></li>
-      <li><strong>Update DynamoDB ExamParticipants:</strong> Set hasSubmitted=true, submittedAt=now()</li>
-      <li><span class="tag be-tag">Firebase WRITE:</span> Update <code>exam-rooms/{examRoomId}/state</code> (increment eventCount)<pre><code>{
-  "state": "IN_PROGRESS",
-  "startedAt": 1705315200000,
-  "durationMinutes": 90,
-  "eventCount": 2,
-  "timestamp": 1705315350000
-}</code></pre></li>
-      <li>Teacher receives Firebase notification → calls <code>GET /participants</code> → sees submission count increased</li>
-      <li>Return 201 Created + submissionId (from Assignment Service response)</li>
+      <li>Student calls Assignment Service directly (not Exam Service)</li>
+      <li><strong>Required field:</strong> <code>"exam_room_id": "ROOM_456"</code> in request body</li>
+      <li>Assignment Service stores submission in unified submissions table</li>
+      <li>Assignment Service webhook/notification triggers Exam Service to:</li>
+      <li style="margin-left:20px;">- Update ExamParticipants: Set hasSubmitted=true, submittedAt=now()</li>
+      <li style="margin-left:20px;">- Update Firebase state: Increment eventCount, update timestamp</li>
+      <li>Teacher receives Firebase notification → submission count increases in real-time</li>
     </ol>
-    <div class="check">✓ Submissions stored in unified Assignment Service table<br/>✓ Query exams via <code>exam_room_id</code> GSI<br/>✓ Exam context preserved for leaderboard calculations</div>
+    <div class="check">✓ Students submit directly to Assignment Service<br/>✓ exam_room_id differentiates exam vs book submissions<br/>✓ Exam Service tracks via webhook notification<br/>✓ Unified submission storage across contexts</div>
   </div>
 
   <h3>POST /end-exam (Teacher)</h3>

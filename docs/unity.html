@@ -268,13 +268,13 @@
 
   <div class="endpoint open">
     <div class="endpoint-head">
-      <span class="method post">POST</span> <code>/v1/exam-room/submit</code>
+      <span class="method post">POST</span> <code>{ASSIGNMENT_BASE_URL}/v1/assignments/{assignmentId}/submissions</code>
       <span class="status-badge available">Available</span>
       <span class="toggle-icon">⌄</span>
     </div>
     <div class="endpoint-body">
       <div class="field-label">Request (Submit all answers)</div>
-      <p style="color:var(--m);font-size:12px;margin-bottom:8px;"><strong>⚠️ IMPORTANT:</strong> <code>exam_room_id</code> is <strong>REQUIRED</strong> to distinguish exam submissions from book study submissions.</p>
+      <p style="color:var(--m);font-size:12px;margin-bottom:8px;"><strong>⚠️ IMPORTANT:</strong> <code>exam_room_id</code> is <strong>REQUIRED</strong> in the request to distinguish exam submissions from book study submissions.</p>
       <pre><code>{
   "exam_room_id": "ROOM_456",
   "score": 85,
@@ -294,23 +294,18 @@
     "message": "OK"
   }
 }</code></pre>
-      <div class="field-label">Validation:</div>
+      <div class="field-label">Required Fields:</div>
       <ul style="color:var(--m);font-size:12px;margin:8px 0 0 18px;list-style:none;">
-        <li>✓ exam_room_id is <strong>required</strong> (must not be empty)</li>
-        <li>✓ Exam room must exist in database</li>
-        <li>✓ Exam room state must be IN_PROGRESS</li>
-        <li>✓ Student must be a participant in the exam</li>
+        <li>✓ <code>exam_room_id</code> - <strong>REQUIRED</strong> to distinguish exam from book submissions</li>
+        <li>✓ <code>score</code> - calculated by student app</li>
+        <li>✓ <code>total_score</code> - max score</li>
+        <li>✓ <code>complete_time</code> - seconds taken</li>
+        <li>✓ <code>answer_details</code> - map of answers</li>
+        <li>✓ <code>is_late</code> - submitted after exam end time</li>
       </ul>
-      <div class="field-label">Error Responses:</div>
-      <div class="error-code err-4">
-        <strong>400:</strong> ExamRoomId is required / Can only submit during IN_PROGRESS state / Participant not found in this exam
-      </div>
-      <div class="error-code err-4">
-        <strong>404:</strong> Exam room not found
-      </div>
       <div class="field-label">Side effect:</div>
-      <p style="color:var(--m);font-size:12px;">Exam Service receives submission → updates ExamParticipants (HasSubmitted, Score) → calls Assignment Service to store unified submission → writes to Firebase → Teacher gets notified (submission count increases)</p>
-      <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Note:</strong> Score is calculated by client before calling this endpoint. Submission is stored in unified Assignment Service table for both exam and book study contexts, but <code>exam_room_id</code> differentiates exam submissions.</p>
+      <p style="color:var(--m);font-size:12px;">Submission Service stores submission in unified table (both exam and book contexts) → Exam Service notifies via Firebase → Teacher gets notified (submission count increases)</p>
+      <p style="color:var(--m);font-size:12px;margin-top:8px;"><strong>Note:</strong> This endpoint is shared between exam and book study contexts. The <code>exam_room_id</code> differentiates exam submissions and allows the Exam Service to track them.</p>
     </div>
   </div>
 
@@ -372,7 +367,7 @@ if (remainingMs <= 0) {
       <li>Teacher clicks Start → Firebase listener receives <code>IN_PROGRESS</code> state</li>
       <li>Extract startedAt + durationMinutes from state → Start countdown timer</li>
       <li>Fetch questions → <code>GET {ASSIGNMENT_BASE_URL}/v1/assignments/{assignmentId}/questions</code></li>
-      <li>Answer and submit questions → <code>POST /v1/exam-room/submit</code> (with exam_room_id)</li>
+      <li>Answer and submit questions → <code>POST {ASSIGNMENT_BASE_URL}/v1/assignments/{assignmentId}/submissions</code> (with exam_room_id)</li>
       <li>Firebase listener notifies teacher of submission</li>
       <li>Teacher ends exam → Firebase listener receives <code>ENDED</code> state</li>
       <li>Show end screen</li>
