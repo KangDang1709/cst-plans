@@ -4,25 +4,26 @@ Read the [Contract](contract.md) first. This page says how to build it.
 
 ## In short
 
-Add a **BellAlert** part to the existing exam service. Don't make a new service: rooms, joining, start/end and results are already here.
+Add a **GoldenBell** part to the existing exam service. Don't make a new service: rooms, joining, start/end and results are already here.
+Use the names from [Terms](contract.md#terms) for every class, route and field.
 Follow the existing style: MediatR commands, DynamoDB, and `FirebaseService` to write to Firebase.
 
 ## What to store (DynamoDB)
 
 | Item | Key | Fields |
 | --- | --- | --- |
-| Live game | `ROOM#{roomId}` / `LIVE` | `currentIndex`, `version` |
+| Live state | `ROOM#{roomId}` / `LIVE` | `currentIndex`, `version` |
 | Question | `ROOM#{roomId}` / `Q#{index}` | `status`, `startedAt`, `deadlineAt`, `timeLimitSec`, and after it ends: `correct`, `wrong`, `total` |
 | Answer | `ROOM#{roomId}#Q#{index}` / `STUDENT#{studentId}` | `answer`, `isCorrect`, `score`, `answeredAt` |
 
-- Change the live game and question items with a check on `version` (conditional write). If the check fails, return `409 VERSION_CONFLICT`.
+- Change the live state and question items with a check on `version` (conditional write). If the check fails, return `409 VERSION_CONFLICT`.
 - Save an answer only if none exists yet (`attribute_not_exists`). Otherwise return `409 ALREADY_SUBMITTED`.
 - Whether these go in the existing table or a new one: check the current key design and choose. Note the choice here.
 
 ## What to build
 
-1. **Allow the mode.** Accept `mode = "bell_alert"` when creating a room.
-2. **Join rule.** In join: if the room is bell_alert and already started, only let back in students who joined before. Also refuse joins above `MaxStudentsPerRoom`.
+1. **Rename and allow the mode** (first task). Change `bell_alert` to `golden_bell` everywhere, starting with the comment on `Mode` in `src/Domain/Entities/ExamRoom.cs`. Accept `mode = "golden_bell"` when creating a room, and add a constant for it instead of typing the string.
+2. **Join rule.** In join: if the room is golden_bell and already started, only let back in students who joined before. Also refuse joins above `MaxStudentsPerRoom`.
 3. **Open a question.** Command `OpenQuestion`:
    - If another question is `ANSWERING`, return `409 QUESTION_RUNNING`.
    - If this one is `NOT_STARTED`: set it to `ANSWERING`, set `startedAt` and `deadlineAt`, and schedule the timed close (below).
@@ -34,10 +35,10 @@ Follow the existing style: MediatR commands, DynamoDB, and `FirebaseService` to 
    - Write `liveQuestion` to Firebase.
 5. **Timed close.** When a question opens, send an SQS message with a delay equal to the time limit. The handler calls `CloseQuestion`. This works even if the teacher's tab is closed.
    The EventBridge Scheduler we use for room start/end is too slow for 30-second questions, so don't use it here.
-6. **Submit an answer.** Check the student is in the room, the question is `ANSWERING`, and the time (plus 1.5 s) hasn't passed. Save the answer, then write `liveAnswers/{index}/{studentId}` to Firebase.
-7. **Results.** `GET .../results` reads the saved counts and the answer items, and adds the students with no answer as `NO_ANSWER`.
-8. **Live state.** `GET .../live` returns the live game, every question's status and the server time.
-9. **End.** In the end command (teacher end and the timed end from `StartExamCommand`), for bell_alert rooms: close the running question, then add up each student's points and time into `Score`, `TotalScore` and `CompleteTime`. The existing leaderboard then works as is.
+6. **Submit an answer.** Command `SubmitAnswer`. Check the student is in the room, the question is `ANSWERING`, and the time (plus 1.5 s) hasn't passed. Save the answer, then write `liveAnswers/{index}/{studentId}` to Firebase.
+7. **Results.** Query `GetQuestionResults` (`GET .../results`) reads the saved counts and the answer items, and adds the students with no answer as `NO_ANSWER`.
+8. **Live state.** Query `GetLiveState` (`GET .../live`) returns the live state: every question's status and the server time.
+9. **End.** In the end command (teacher end and the timed end from `StartExamCommand`), for golden_bell rooms: close the running question, then add up each student's points and time into `Score`, `TotalScore` and `CompleteTime`. The existing leaderboard then works as is.
 
 ## Watch out for
 

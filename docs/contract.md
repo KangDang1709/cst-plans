@@ -3,6 +3,32 @@
 This is what the backend, the teacher web and the student app must agree on.
 If you change anything here, tell the other two teams.
 
+## Terms
+
+Use these exact words in code, API, Firebase, Trello and chat. Don't invent synonyms (no "bell alert", "stats", "reveal", "round").
+
+| Term | Meaning | In code |
+| --- | --- | --- |
+| Rung Chuông Vàng | The feature. Say this to people. | Mode value `golden_bell`. Prefix `GoldenBell` for classes and files, `GOLDEN_BELL` for constants, in all 3 repos. |
+| Normal mode | Today's exam, where each student does the whole test alone | Mode value `auto_advance` |
+| Room | One exam room, as today | `roomId` (the existing exam room id) |
+| Game | One Rung Chuông Vàng run in a room, from Start to End | (no code name, use Room) |
+| Live state | The live question plus every question's status | `GET .../live`, `LiveState` |
+| Question | One question of the room's assignment | `index`, starting at 0. On screen show "Câu {index + 1}". |
+| Question status | Where a question is | `NOT_STARTED`, `ANSWERING`, `DONE` |
+| Live question | The question everyone sees now | Firebase `liveQuestion` |
+| Open | Teacher shows a question (starts it if `NOT_STARTED`) | `OpenQuestion` (BE), `openQuestion` (web) |
+| Close | End a question now or when time runs out | `CloseQuestion` (BE), `closeQuestion` (web) |
+| Submit | Student presses Nộp bài and sends the answer | `SubmitAnswer` (BE), `submitAnswer` (Unity) |
+| Answered | A student has submitted for this question | Firebase `liveAnswers` |
+| Results | Right/wrong counts and per-student result for a `DONE` question | `GET .../results`, `QuestionResults` |
+| Result | One student's result on one question | `CORRECT`, `WRONG`, `NO_ANSWER`. On screen: Đúng / Sai. |
+| Time limit | Seconds a question stays `ANSWERING` | `timeLimitSec` |
+| Deadline | When the question closes | `deadlineAt` (server time, epoch ms) |
+| Room duration | Total time for the whole room (15 to 90 min) | `durationMinutes` (existing) |
+| Host screen | The teacher's screen for running the game | `GoldenBellHost` (web) |
+| Student | A student in the room | `studentId` (the same id the existing participant list uses) |
+
 ## Question status
 
 Each question in a room has one status:
@@ -125,9 +151,9 @@ The 1.5 s grace covers an answer sent right before 0 on a slow network.
 
 | Call | Change |
 | --- | --- |
-| `POST /join` | For a bell_alert room that has started, only students who already joined can get back in. Others get `403 GAME_STARTED`. |
+| `POST /join` | For a golden_bell room that has started, only students who already joined can get back in. Others get `403 GAME_STARTED`. |
 | `POST /end` (and the timed end) | Ends any `ANSWERING` question first, then saves each student's total so the leaderboard works as today. |
-| Create room | `mode = "bell_alert"` is now allowed. The duration stays and means "the whole room". |
+| Create room | `mode = "golden_bell"` is now allowed. The duration stays and means "the whole room". |
 
 ## Scoring
 
@@ -139,6 +165,6 @@ The 1.5 s grace covers an answer sent right before 0 on a slow network.
 
 | Name | Default | Meaning |
 | --- | --- | --- |
-| `BellAlert:QuestionTimeLimitSec` | 30 | Seconds per question until the PO decides otherwise |
-| `BellAlert:MaxStudentsPerRoom` | 1000 | Join is refused above this |
-| `BellAlert:AnswerGraceMs` | 1500 | Late answers accepted after the deadline |
+| `GoldenBell:QuestionTimeLimitSec` | 30 | Seconds per question until the PO decides otherwise |
+| `GoldenBell:MaxStudentsPerRoom` | 1000 | Join is refused above this |
+| `GoldenBell:AnswerGraceMs` | 1500 | Late answers accepted after the deadline |

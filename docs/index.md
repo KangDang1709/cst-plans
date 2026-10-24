@@ -1,6 +1,6 @@
 # Rung Chuông Vàng: start here
 
-Rung Chuông Vàng is a new way to run an exam room (`mode = "bell_alert"`).
+Rung Chuông Vàng is a new way to run an exam room (`mode = "golden_bell"`).
 In the normal mode (`auto_advance`), every student works through the whole test alone.
 In Rung Chuông Vàng, **the teacher runs the game one question at a time**, and all students answer the same question together.
 
@@ -14,6 +14,8 @@ In Rung Chuông Vàng, **the teacher runs the game one question at a time**, and
 | [Student app](unity.md) | Unity team | What to build in `ConSangTao` |
 
 Progress is tracked in Trello, not here.
+
+**Names:** the feature is "Rung Chuông Vàng" for people and `golden_bell` / `GoldenBell` / `GOLDEN_BELL` in code, in all 3 repos. The old name `bell_alert` is gone; don't use it. Every other name we use (question status, open, close, submit, results…) is in [Terms](contract.md#terms). Use those words everywhere, including Trello cards.
 
 ## How a game goes
 
@@ -55,13 +57,13 @@ sequenceDiagram
 
 ## Rules (agreed with the PO)
 
-- The teacher can only go to the next question after the current one has ended and shows results.
+- The teacher can only go to the next question after the current one is closed and shows its results.
 - **Câu trước** / **Câu tiếp theo** go to the question just before or after. The teacher can also pick any question from the list.
-- Opening a question that has ended shows only its results. Opening a question that hasn't been played starts it for everyone.
+- Opening a closed question shows only its results. Opening a question that hasn't been played starts it for everyone.
 - Students confirm with **Nộp bài** in the existing in-game menu.
 - No one can join after the game starts. Students who were already in can reconnect.
 - The room ends on time or when the teacher ends it.
-- No correct-answer reveal for now, but the design should allow adding it later.
+- Students don't see the correct answer for now, but the design should allow adding it later.
 - Rooms can have 50 to 1,000 students.
 - Students who don't submit count as wrong. The % bar counts everyone in the room.
 
@@ -87,4 +89,4 @@ If the PO changes one of these, update this table and the [Contract](contract.md
 
 Add this line to each repo's AI instructions (`CLAUDE.md`, `.github/copilot-instructions.md` or similar):
 
-> For Rung Chuông Vàng (bell_alert) work, read `../cst-plans/docs/index.md`, `contract.md` and this repo's page first. If you change an endpoint, payload or Firebase field, update `contract.md` in the same session.
+> For Rung Chuông Vàng (golden_bell) work, read `../cst-plans/docs/index.md`, `contract.md` and this repo's page first. If you change an endpoint, payload or Firebase field, update `contract.md` in the same session.
