@@ -13,7 +13,7 @@ In Rung Chuông Vàng, **the teacher runs the game one question at a time**, and
 | [Teacher web](web.md) | Web team | What to build in `WebGV-CST` |
 | [Student app](unity.md) | Unity team | What to build in `ConSangTao` |
 
-Progress is tracked in Trello, not here.
+**Tickets:** the **What to build** section of each team page is that team's ticket list (3 or 4 big tickets), in order. One dev per team works top to bottom. One ticket = one Trello card = one PR. Progress is tracked in Trello, not here.
 
 **Names:** the feature is "Rung Chuông Vàng" for people and `golden_bell` / `GoldenBell` / `GOLDEN_BELL` in code, in all 3 repos. The old name `bell_alert` is gone; don't use it. Every other name we use (question status, open, close, submit, results…) is in [Terms](contract.md#terms). Use those words everywhere, including Trello cards.
 
